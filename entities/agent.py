@@ -75,30 +75,11 @@ class Agent(arcade.Sprite):
                 self.interact_with_point(closest)
     
     def interact_with_point(self, interaction_point):
-        interaction_type = interaction_point['type']
-        
-        if interaction_type == "mission_desk":
-            self.give_mission_to_hero()
-        elif interaction_type == "surveillance_upgrade":
-            self.upgrade_surveillance()
-        elif interaction_type == "betting_station":
-            self.place_bet()
-        elif interaction_type == "data_analysis":
-            self.analyze_hero_data()
-    
-    def give_mission_to_hero(self):
-        if self.mission_system and not self.mission_system.current_mission:
-            self.mission_system.start_random_mission()
-            print("Mission donnée au héros!")
-    
-    def upgrade_surveillance(self):
-        print("Amélioration de la surveillance activée!")
-    
-    def place_bet(self):
-        print("Pari placé sur le héros!")
-    
-    def analyze_hero_data(self):
-        print("Analyse des données du héros...")
+        # Utiliser le système de missions pour gérer l'interaction
+        if self.mission_system:
+            result = self.mission_system.interact_with_point(interaction_point['name'])
+            print(f"Interaction avec {interaction_point['name']}: {result}")
+            self.interact_pressed = False
     
     def on_key_press(self, key, modifiers):
         if key == arcade.key.LEFT:

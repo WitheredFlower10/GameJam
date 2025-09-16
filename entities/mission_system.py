@@ -10,6 +10,13 @@ class MissionSystem:
         self.available_missions = []
         self.ship_interaction_points = []
         
+        # Système de paris
+        self.betting_active = False
+        self.bet_amount = 0
+        self.bet_type = None  # "success" ou "failure"
+        self.bet_placed = False
+        self.bet_result = None
+        
         self.create_mission_templates()
     
     def create_mission_templates(self):
@@ -81,8 +88,12 @@ class MissionSystem:
             if self.hero:
                 self.current_mission['progress'] = self.hero.get_progress_percentage()
                 
-                # Vérifier si la mission est terminée
-                if self.hero.is_mission_complete():
+                # Vérifier si la mission de bataille est terminée
+                if (self.hero.battle_mission and 
+                    self.hero.battle_mission.mission_completed):
+                    self.complete_mission()
+                # Vérifier si la mission est terminée normalement
+                elif self.hero.is_mission_complete():
                     self.complete_mission()
                 elif self.hero.is_mission_failed():
                     self.fail_mission()
@@ -112,5 +123,118 @@ class MissionSystem:
                 nearby.append(point)
         return nearby
     
+    def interact_with_point(self, point_name):
+        # Gérer les interactions avec les points d'intérêt
+        if point_name == "Bureau des Missions":
+            if not self.current_mission:
+                self.start_random_mission()
+                return "Mission assignée au héros !"
+            else:
+                return "Une mission est déjà en cours."
+        elif point_name == "Amélioration Surveillance":
+            return "Surveillance améliorée !"
+        elif point_name == "Station de Paris":
+            if not self.current_mission:
+                return "Aucune mission active pour parier."
+            elif self.bet_placed:
+                return "Un pari est déjà placé sur cette mission."
+            else:
+                self.betting_active = True
+                return "Interface de paris ouverte !"
+        elif point_name == "Analyse de Données":
+            return "Données analysées !"
+        else:
+            return "Interaction effectuée."
+    
     def set_ship_interaction_points(self, points):
         self.ship_interaction_points = points
+    
+    def place_bet(self, bet_type, amount):
+        # Placer un pari sur la mission
+        if not self.current_mission:
+            return "Aucune mission active."
+        if self.bet_placed:
+            return "Un pari est déjà placé."
+        
+        self.bet_type = bet_type  # "success" ou "failure"
+        self.bet_amount = amount
+        self.bet_placed = True
+        self.betting_active = False
+        
+        return f"Pari de {amount} crédits placé sur {bet_type} !"
+    
+    def calculate_bet_result(self):
+        # Calculer le résultat du pari
+        if not self.bet_placed:
+            return None
+        
+        # Déterminer si la MISSION DE BATAILLE (mission principale du héros) a réussi
+        # C'est sur cette mission qu'on parie
+        mission_success = False
+        
+        if self.hero and self.hero.battle_mission:
+            # La mission de bataille est réussie si des ennemis ont été détruits
+            mission_success = self.hero.battle_mission.enemies_destroyed > 0
+            print(f"Debug - Mission de bataille du héros:")
+            print(f"Debug - Ennemis détruits: {self.hero.battle_mission.enemies_destroyed}")
+            print(f"Debug - Mission de bataille réussie: {mission_success}")
+        else:
+            # Fallback pour d'autres types de missions
+            mission_success = self.hero.is_mission_complete() if self.hero else False
+            print(f"Debug - Mission réussie (autre type): {mission_success}")
+        
+        # Créer un résultat détaillé
+        self.bet_result = {
+            'bet_type': self.bet_type,
+            'bet_amount': self.bet_amount,
+            'mission_success': mission_success,
+            'won': False,
+            'winnings': 0,
+            'message': ""
+        }
+        
+        # Calculer les gains/pertes
+        if self.bet_type == "success" and mission_success:
+            # Pari gagné sur la réussite de la MISSION DE BATAILLE
+            self.bet_result['won'] = True
+            self.bet_result['winnings'] = self.bet_amount * 2
+            self.bet_result['message'] = f"🎉 PARI GAGNÉ ! 🎉\nVous aviez parié sur la RÉUSSITE\nMission de bataille du héros: RÉUSSIE ✅\nGains: +{self.bet_result['winnings']} crédits"
+        elif self.bet_type == "failure" and not mission_success:
+            # Pari gagné sur l'échec de la MISSION DE BATAILLE
+            self.bet_result['won'] = True
+            self.bet_result['winnings'] = self.bet_amount * 2
+            self.bet_result['message'] = f"🎉 PARI GAGNÉ ! 🎉\nVous aviez parié sur l'ÉCHEC\nMission de bataille du héros: ÉCHOUÉE ❌\nGains: +{self.bet_result['winnings']} crédits"
+        else:
+            # Pari perdu
+            self.bet_result['won'] = False
+            self.bet_result['winnings'] = -self.bet_amount
+            if self.bet_type == "success":
+                self.bet_result['message'] = f"💸 PARI PERDU 💸\nVous aviez parié sur la RÉUSSITE\nMission de bataille du héros: ÉCHOUÉE ❌\nPertes: -{self.bet_amount} crédits"
+            else:
+                self.bet_result['message'] = f"💸 PARI PERDU 💸\nVous aviez parié sur l'ÉCHEC\nMission de bataille du héros: RÉUSSIE ✅\nPertes: -{self.bet_amount} crédits"
+        
+        return self.bet_result
+    
+    def close_betting_interface(self):
+        self.betting_active = False
+    
+    def get_betting_info(self):
+        if not self.betting_active:
+            return None
+        
+        return {
+            'mission_name': self.current_mission['name'] if self.current_mission else "Aucune",
+            'mission_progress': self.hero.get_progress_percentage() if self.hero else 0,
+            'hero_health': self.hero.get_health_percentage() if self.hero else 0,
+            'hero_stamina': self.hero.get_stamina_percentage() if self.hero else 0
+        }
+    
+    def is_mission_finished(self):
+        # Vérifier si la mission est terminée
+        if not self.current_mission:
+            return False
+        
+        if self.hero and self.hero.battle_mission:
+            return self.hero.battle_mission.is_mission_finished()
+        
+        return False

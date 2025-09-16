@@ -68,9 +68,19 @@ class BattleMission:
         self.is_active = False
         self.mission_completed = True
         print(f"Mission terminée ! Ennemis détruits : {self.enemies_destroyed}")
+        print(f"Mission completed flag: {self.mission_completed}")
+        print(f"Mission active flag: {self.is_active}")
+        
+        # S'assurer que le flag reste à True
+        if not self.mission_completed:
+            self.mission_completed = True
+            print("Flag mission_completed forcé à True")
     
     def update(self, delta_time):
         if not self.is_active:
+            # Si la mission est terminée, on ne fait rien mais on garde le flag
+            if self.mission_completed:
+                return
             return
         
         current_time = time.time()
@@ -202,6 +212,12 @@ class BattleMission:
         
         self.player_sprite.center_x = max(screen_left, min(screen_right, self.player_sprite.center_x))
         self.player_sprite.center_y = max(screen_bottom, min(screen_top, self.player_sprite.center_y))
+    
+    def is_mission_finished(self):
+        # Vérifier si la mission est vraiment terminée
+        result = self.mission_completed and not self.is_active
+        print(f"Debug - is_mission_finished: {result} (completed: {self.mission_completed}, active: {self.is_active})")
+        return result
     
     
     def draw(self):
