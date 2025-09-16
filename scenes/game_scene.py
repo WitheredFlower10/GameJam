@@ -99,6 +99,13 @@ class GameScene(arcade.View):
             self.assistant.protect_hero()
         elif key == arcade.key.S:
             self.assistant.attack_enemies()
+        elif key == arcade.key.LEFT:
+            self.assistant.move_left(PLAYER_MOVEMENT_SPEED)
+        elif key == arcade.key.RIGHT:
+            self.assistant.move_right(PLAYER_MOVEMENT_SPEED)
+        elif key == arcade.key.UP:
+            self.assistant.jump(PLAYER_JUMP_SPEED)
     
     def on_key_release(self, key, modifiers):
-        pass
+        if key in (arcade.key.LEFT, arcade.key.RIGHT):
+            self.assistant.stop()
