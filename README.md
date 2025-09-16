@@ -1,74 +1,92 @@
-# L'Assistant du Héros
+# Agent de Missions
 
-## Pitch du jeu
+## Pitch du Jeu
 
-Nous proposons de développer un jeu de plateforme/aventure où le joueur incarne l'assistant du héros, et non le héros lui-même. Tout au long de l'histoire, l'assistant aide le héros à franchir les obstacles, à affronter les ennemis et même à vaincre le boss final… tout en restant dans l'ombre. Mais à la fin, lorsque le héros s'apprête à recevoir tous les honneurs, l'assistant réalise que c'est en réalité lui qui a tout accompli. Son objectif devient alors de prendre la place du héros et de devenir, enfin, le centre de l'histoire. Le jeu propose une narration ironique et cyclique : chaque partie se termine par un changement de rôle, où l'assistant devient le héros, et un nouveau personnage secondaire vient le suivre.
+Vous êtes… l'agent de missions.
 
-## Technologies utilisées
+Votre rôle ? Distribuer des objectifs préétablis aux héros galactiques de passage, puis retourner à vos vraies responsabilités : classer les dossiers numériques, tamponner des autorisations, calibrer des drones de surveillance… Pendant que, quelque part dans l'espace, la véritable bataille se joue à coups de lasers, de robots et d'explosions spatiales.
 
-- **Python 3.8+**
-- **Arcade 2.6.17** - Bibliothèque de jeu 2D moderne avec OpenGL
-- **Pymunk 6.5.2** - Moteur physique pour les collisions avancées
+Parfois, entre deux piles de paperasse futuriste, vous pouvez jeter un œil grâce à une caméra orbitale : vaisseaux qui s'affrontent, stations qui explosent, légendes interstellaires en train de s'écrire… Mais jamais de votre main. Vous n'êtes qu'un rouage secondaire, un spectateur de la guerre.
 
-## Installation
+Votre objectif : remplir vos tâches administratives pour avoir le temps d'espionner — de loin — les exploits des véritables héros.
 
-1. Installer Python 3.8 ou plus récent
-2. Installer les dépendances :
-```bash
-pip install -r requirements.txt
+## Mécaniques de Jeu
+
+### Rôle du Joueur
+- **Agent de missions** : Vous distribuez des quêtes aux héros
+- **Administrateur** : Vous gérez des tâches administratives dans votre vaisseau
+- **Spectateur** : Vous observez les exploits des héros sur un écran de surveillance
+
+### Navigation
+- **Mouvement** : Flèches gauche/droite pour se déplacer dans le vaisseau
+- **Sections** : Avant (missions), Centre (surveillance), Arrière (paris/analyse)
+- **Interactions** : Espace pour interagir avec les points d'intérêt
+
+### Système de Missions
+- **Distribution** : Donner des missions aux héros depuis le bureau des missions
+- **Surveillance** : Observer la progression du héros en temps réel
+- **Résultats** : Les héros peuvent réussir, échouer ou abandonner
+
+### Mini-Quêtes
+- **Amélioration surveillance** : Améliorer la qualité de l'écran de surveillance
+- **Station de paris** : Parier sur la réussite/échec des héros
+- **Analyse de données** : Obtenir des informations détaillées sur les héros
+
+## Architecture Technique
+
+### Structure du Projet
+```
+GameJam/
+├── main.py                 # Point d'entrée du jeu
+├── scenes/
+│   └── main_scene.py       # Scène principale du jeu
+├── entities/
+│   ├── agent.py           # Personnage du joueur
+│   ├── hero.py            # Héros contrôlé par l'IA
+│   ├── ship.py            # Vaisseau et points d'interaction
+│   ├── mission_system.py  # Système de gestion des missions
+│   └── surveillance_screen.py # Écran de surveillance
+├── utils/
+│   └── constants.py       # Constantes du jeu
+└── README.md
 ```
 
-## Lancement du jeu
+### Technologies
+- **Arcade** : Framework 2D pour Python
+- **Architecture orientée entités** : Chaque élément du jeu est une entité
+- **Système de scènes** : Gestion des différentes vues du jeu
 
+## Installation et Lancement
+
+### Prérequis
+- Python 3.7+
+- Arcade 2.6+
+
+### Installation
+```bash
+pip install arcade
+```
+
+### Lancement
 ```bash
 python main.py
 ```
 
 ## Contrôles
 
-- **Flèches gauche/droite** : Déplacer l'assistant
-- **Espace** : Sauter
-- **A** : Aider le héros (mécanique principale)
+- **Flèches gauche/droite** : Se déplacer dans le vaisseau
+- **Espace** : Interagir avec les points d'intérêt
+- **Échap** : Quitter le jeu
 
-## Structure du projet
+## Développement
 
-```
-GameJam/
-├── main.py                 # Point d'entrée du jeu
-├── requirements.txt        # Dépendances Python
-├── scenes/                 # Scènes du jeu
-│   ├── game_scene.py      # Scène principale
-│   └── __init__.py
-├── entities/              # Entités du jeu
-│   ├── assistant.py       # L'assistant (joueur)
-│   ├── hero.py           # Le héros
-│   └── __init__.py
-├── utils/                 # Utilitaires
-│   ├── constants.py       # Constantes du jeu
-│   └── __init__.py
-└── assets/               # Ressources (à créer)
-    ├── sprites/
-    ├── sounds/
-    └── fonts/
-```
+### Prochaines Fonctionnalités
+- [ ] Système de paris plus avancé
+- [ ] Plus de types de missions
+- [ ] Améliorations visuelles
+- [ ] Système de progression du joueur
+- [ ] Événements aléatoires
+- [ ] Interface utilisateur améliorée
 
-## Équipe de développement
-
-- [Noms des 5 développeurs à ajouter]
-
-## Plan de développement
-
-### Mardi
-- **8h30-12h** : Setup projet + mécaniques de base
-- **12h** : Deadline 1 - Pitch finalisé
-- **17h** : Nom du jeu déterminé
-- **Soir** : Premiers visuels
-
-### Mercredi
-- **Journée** : Développement des mécaniques avancées
-- **16h30** : Affiche + jeu quasi final
-
-### Jeudi
-- **Matin** : Finalisation
-- **Midi** : Vidéo 30s + jeu final
-- **Après-midi** : Tests et présentations
+### Contribution
+Ce projet est développé pour une game jam de 2.5 jours avec une équipe de 5 personnes.
