@@ -103,6 +103,7 @@ class MissionAgentGame(arcade.Window):
 
 
 def main():
+    arcade.load_font("assets/fonts/ByteBounce.ttf")
     game = MissionAgentGame()
     game.setup()  # Initialiser après la création de la fenêtre
     game.run()

@@ -63,7 +63,7 @@ class Agent(arcade.Sprite):
         self.world_left = 0
         self.world_right = SCREEN_WIDTH
         # Hauteur du sol où le personnage se tient
-        self.ground_y = 200  # Ajusté pour le nouveau background
+        self.ground_y = 320  # Ajusté pour le nouveau background
     
     def set_mission_system(self, mission_system):
         self.mission_system = mission_system

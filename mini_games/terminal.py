@@ -27,7 +27,7 @@ class MainTerminal:
 
 
     def on_draw(self):
-        # 小终端参数
+    # Paramètres de la mini-fenêtre du terminal
         w, h = 450, 300
         screen_width, screen_height = self.window.width, self.window.height
         x = screen_width - w - 30
@@ -35,14 +35,14 @@ class MainTerminal:
         term_green = (0, 255, 0)
         font_terminal = self.font_terminal
 
-        # 背景 + 边框
+    # Fond + bordure
         arcade.draw_lrbt_rectangle_filled(x, x+w, y, y+h, (0, 0, 0, 230))
         arcade.draw_lrbt_rectangle_outline(x, x+w, y, y+h, term_green, 2)
 
-        # 标题
+    # Titre
         arcade.draw_text("Terminal", x+18, y+h-38, term_green, 18, font_name=font_terminal, bold=True)
 
-        # 菜单选项
+    # Options du menu
         option_gap = 32
         for i, option in enumerate(self.menu_options):
             oy = y + h - 70 - i * option_gap
