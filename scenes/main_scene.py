@@ -38,6 +38,8 @@ class MainScene(arcade.View):
 
         # Texture d'arrière-plan (monde)
         self.background_texture = None
+        # Décalage vertical du background (positif = vers le haut, négatif = vers le bas)
+        self.background_y_offset = -5
         
         # État du jeu
         self.game_state = GAME_STATE_PLAYING
@@ -98,6 +100,8 @@ class MainScene(arcade.View):
         # Configurer les caméras
         self.camera = arcade.camera.Camera2D()
         self.gui_camera = arcade.camera.Camera2D()
+        # Zoom fixe (dézoomer un peu la vue). 1.0 = normal, <1 = dézoom
+        self.camera_zoom = 0.85
         
         # Déterminer la taille du monde (selon le vaisseau ou une texture de fond)
         self.determine_world_size()
@@ -279,16 +283,16 @@ class MainScene(arcade.View):
                 if hasattr(arcade, "draw_scaled_texture_rectangle"):
                     arcade.draw_scaled_texture_rectangle(
                         self.background_texture.width // 2,  # center_x
-                        self.background_texture.height // 2,  # center_y
+                        (self.background_texture.height // 2) + self.background_y_offset,  # center_y avec décalage
                         self.background_texture,
-                        0.5,  # scale
+                        1.0,  # scale
                         0     # angle
                     )
                 # Sinon draw_texture_rectangle classique
                 elif hasattr(arcade, "draw_texture_rectangle"):
                     arcade.draw_texture_rectangle(
                         self.background_texture.width // 2,  # center_x
-                        self.background_texture.height // 2,  # center_y
+                        (self.background_texture.height // 2) + self.background_y_offset,  # center_y avec décalage
                         self.background_texture.width,  # width
                         self.background_texture.height,  # height
                         self.background_texture
@@ -297,7 +301,7 @@ class MainScene(arcade.View):
                 elif hasattr(arcade, "draw_lrwh_rectangle_textured"):
                     arcade.draw_lrwh_rectangle_textured(
                         0, self.background_texture.width,  # left, right
-                        0, self.background_texture.height,  # bottom, top
+                        0 + self.background_y_offset, self.background_texture.height + self.background_y_offset,  # bottom, top avec décalage
                         self.background_texture
                     )
                 else:
@@ -306,7 +310,7 @@ class MainScene(arcade.View):
                     bg_sprite = arcade.Sprite()
                     bg_sprite.texture = self.background_texture
                     bg_sprite.left = 0
-                    bg_sprite.bottom = 0
+                    bg_sprite.bottom = 0 + self.background_y_offset
                     self._bg_sprite_list.append(bg_sprite)
                     self._bg_sprite_list.draw()
                     
@@ -547,8 +551,10 @@ class MainScene(arcade.View):
         """Repositionne immédiatement la caméra après un redimensionnement"""
         screen_w = self.window.width
         screen_h = self.window.height
-        half_w = screen_w / 2
-        half_h = screen_h / 2
+        # Corriger pour le zoom: demi-largeur/hauteur en unités monde
+        zoom = getattr(self, 'camera_zoom', 1.0) or 1.0
+        half_w = (screen_w / 2) / zoom
+        half_h = (screen_h / 2) / zoom
 
         # Cibler le centre sur l'agent en X
         target_center_x = max(self.world_left + half_w, min(self.world_right - half_w, self.agent.center_x))
@@ -556,6 +562,11 @@ class MainScene(arcade.View):
 
         # Positionnement immédiat (sans easing)
         self.camera.position = (target_center_x, target_center_y)
+        # Appliquer le zoom fixe
+        try:
+            self.camera.zoom = self.camera_zoom
+        except Exception:
+            pass
         print(f"Caméra repositionnée à: ({target_center_x}, {target_center_y})")
 
     def update_camera(self):
@@ -563,8 +574,10 @@ class MainScene(arcade.View):
         # En fullscreen, on utilise la taille réelle de l'écran
         screen_w = self.window.width
         screen_h = self.window.height
-        half_w = screen_w / 2
-        half_h = screen_h / 2
+        # Corriger pour le zoom: demi-largeur/hauteur en unités monde
+        zoom = getattr(self, 'camera_zoom', 1.0) or 1.0
+        half_w = (screen_w / 2) / zoom
+        half_h = (screen_h / 2) / zoom
 
         # Cibler le centre sur l'agent en X
         target_center_x = max(self.world_left + half_w, min(self.world_right - half_w, self.agent.center_x))
@@ -579,6 +592,11 @@ class MainScene(arcade.View):
         new_x = current_x + (target_center_x - current_x) * ease
         new_y = current_y + (target_center_y - current_y) * ease
         self.camera.position = (new_x, new_y)
+        # Appliquer le zoom fixe
+        try:
+            self.camera.zoom = self.camera_zoom
+        except Exception:
+            pass
     
     def on_key_press(self, key, modifiers):
         if key == arcade.key.ESCAPE:
