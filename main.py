@@ -8,6 +8,7 @@ class MissionAgentGame(arcade.Window):
     
     def __init__(self):
         # Détecter le système d'exploitation
+        w,h = arcade.get_display_size()
         self.is_macos = platform.system() == "Darwin"
         self.fullscreen_enabled = False
         self.allow_fullscreen_toggle = True  # Permet le toggle seulement dans le menu
@@ -16,8 +17,7 @@ class MissionAgentGame(arcade.Window):
         try:
             if self.is_macos:
                 # Sur macOS, démarrer en fenêtré puis passer en fullscreen
-                super().__init__(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE, resizable=True)
-                print("macOS détecté - Démarrage en mode fenêtré")
+                super().__init__(self.w, self.h, SCREEN_TITLE, resizable=False)
             else:
                 # Sur Windows/Linux, fullscreen direct
                 super().__init__(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE, fullscreen=True)
