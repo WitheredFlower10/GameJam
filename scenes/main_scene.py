@@ -27,9 +27,21 @@ class MainScene(arcade.View):
         self.camera = None
         self.gui_camera = None
         
+        # Monde (dimensions/bornes caméra)
+        self.world_width = SCREEN_WIDTH
+        self.world_height = SCREEN_HEIGHT
+        self.world_left = 0
+        self.world_right = self.world_width
+        
+        # Message flottant (UI)
+        self.floating_message = None  # {'text': str, 'color': tuple, 'y': int, 'frames': int}
+
+        # Texture d'arrière-plan (monde)
+        self.background_texture = None
+        
         # État du jeu
         self.game_state = GAME_STATE_PLAYING
-        self.current_ship_section = 1
+        self.current_ship_section = 1  # 0=Avant, 1=Centre, 2=Arrière
         self.surveillance_was_displayed = False
         
         self.setup()
@@ -41,8 +53,9 @@ class MainScene(arcade.View):
         
         # Initialiser les entités
         self.agent = Agent()
-        self.agent.center_x = SCREEN_WIDTH // 2
-        self.agent.center_y = 100
+        # Démarrer au centre du monde (x=0)
+        self.agent.center_x = 0
+        self.agent.center_y = 80  # au bas de l'écran
         self.agent_list.append(self.agent)
         
         self.hero = Hero()
@@ -56,6 +69,12 @@ class MainScene(arcade.View):
         self.camera = arcade.camera.Camera2D()
         self.gui_camera = arcade.camera.Camera2D()
         
+        # Déterminer la taille du monde (selon le vaisseau ou une texture de fond)
+        self.determine_world_size()
+        # Propager les bornes monde centrées (ex: -2000 .. 2000)
+        self.agent.world_left = self.world_left
+        self.agent.world_right = self.world_right
+
         # Lier les systèmes
         self.mission_system.set_hero(self.hero)
         self.surveillance_screen.set_hero(self.hero)
@@ -67,11 +86,68 @@ class MainScene(arcade.View):
         # Ne pas démarrer de mission automatiquement
         # La mission sera assignée via les interactions
     
+    def determine_world_size(self):
+        """Détermine la taille du monde pour la caméra.
+        Priorité: Ship.world_width/world_height, sinon lecture d'une texture 'background.png'."""
+        # Par défaut
+        self.world_width = SCREEN_WIDTH
+        self.world_height = SCREEN_HEIGHT
+        self.world_left = -self.world_width // 2
+        self.world_right = self.world_width // 2
+        
+        # 1) Préférence: attributs sur le vaisseau
+        has_ship_world = False
+        if hasattr(self.ship, 'world_width') and hasattr(self.ship, 'world_height'):
+            try:
+                w = int(getattr(self.ship, 'world_width'))
+                h = int(getattr(self.ship, 'world_height'))
+                if w > 0 and h > 0:
+                    self.world_width = w
+                    self.world_height = h
+                    self.world_left = -w // 2
+                    self.world_right = w // 2
+                    has_ship_world = True
+            except Exception:
+                pass
+        
+        # 2) Sinon: tenter de charger une texture d'arrière-plan
+        candidate_paths = []
+        # Essayer des chemins potentiels fournis par le Ship
+        for attr_name in ('background_texture_path', 'background_path', 'texture_path'):
+            if hasattr(self.ship, attr_name):
+                path = getattr(self.ship, attr_name)
+                if isinstance(path, str):
+                    candidate_paths.append(path)
+        # Valeurs par défaut
+        candidate_paths.extend(['background.png', 'assets/background.png'])
+        
+        for path in candidate_paths:
+            try:
+                tex = arcade.load_texture(path)
+                if tex and tex.width > 0 and tex.height > 0:
+                    self.background_texture = tex
+                    # Si aucune taille monde fiable fournie par le vaisseau, utiliser celle de la texture
+                    if not has_ship_world:
+                        self.world_width = tex.width
+                        self.world_height = tex.height
+                        self.world_left = -tex.width // 2
+                        self.world_right = tex.width // 2
+                    return
+            except Exception:
+                continue
+        # Si rien trouvé, on conserve la taille d'écran par défaut
+        # Forcer une carte large minimale si désiré (ex: 4000px)
+        if self.world_width < 4000:
+            self.world_width = 4000
+            self.world_left = -2000
+            self.world_right = 2000
+
     def on_draw(self):
         self.clear()
         
         # Dessiner le vaisseau et l'agent
         self.camera.use()
+        self.draw_background()
         self.ship.draw()
         self.ship.draw_interaction_points()
         
@@ -91,12 +167,10 @@ class MainScene(arcade.View):
                 if (self.mission_system.bet_placed and not self.mission_system.bet_result):
                     self.mission_system.calculate_bet_result()
                     print("Résultat du pari calculé - Écran de surveillance fermé !")
-        if getattr(self, '_floating_message', None):
-            msg = self._floating_message
-            arcade.draw_text(msg['text'], SCREEN_WIDTH//2, msg['y'], msg['color'], 20, anchor_x="center", anchor_y="center")
-
+        
         # Interface utilisateur
         self.gui_camera.use()
+        self.draw_floating_message()
         self.draw_ui()
     
     def draw_ui(self):
@@ -104,10 +178,10 @@ class MainScene(arcade.View):
         arcade.draw_text("Agent de Missions", 10, SCREEN_HEIGHT - 30, 
                         arcade.color.WHITE, 24, bold=True)
         
-        # Or en haut à droite
-        gold_text = f"Or: {self.mission_system.gold}"
-        arcade.draw_text(gold_text, SCREEN_WIDTH - 10, SCREEN_HEIGHT - 30,
-                         arcade.color.GOLD, 18, anchor_x="right", bold=True)
+        # Informations sur la section du vaisseau
+        section_names = ["Avant", "Centre", "Arrière"]
+        arcade.draw_text(f"Section: {section_names[self.current_ship_section]}", 
+                        10, SCREEN_HEIGHT - 60, arcade.color.WHITE, 16)
         
         # État de la mission
         if self.mission_system.current_mission:
@@ -146,6 +220,68 @@ class MainScene(arcade.View):
         arcade.draw_text("ÉCHAP: Retour au menu", 
                         SCREEN_WIDTH - 200, 30, arcade.color.LIGHT_GRAY, 12)
     
+    def draw_floating_message(self):
+        # Dessiner un message flottant centré (en coordonnées écran/GUI)
+        if not self.floating_message:
+            return
+        msg = self.floating_message
+        arcade.draw_text(
+            msg['text'],
+            SCREEN_WIDTH // 2,
+            msg['y'],
+            msg.get('color', arcade.color.WHITE),
+            18,
+            anchor_x="center",
+            bold=True
+        )
+
+    def draw_background(self):
+        if not hasattr(self, "_bg_ready") or not self._bg_ready:
+            try:
+                # Si ton Ship expose déjà une texture, récupère-la :
+                if hasattr(self.ship, "background_texture"):
+                    self._bg_tex = self.ship.background_texture
+                elif hasattr(self.ship, "get_background_texture"):
+                    self._bg_tex = self.ship.get_background_texture()
+                else:
+                    self._bg_tex = arcade.load_texture("background.png")
+            except Exception:
+                self._bg_tex = None
+
+            # Déduis les bornes du monde
+            if self._bg_tex is not None:
+                self.world_width = getattr(self, "world_width", self._bg_tex.width)
+                self.world_height = getattr(self, "world_height", self._bg_tex.height)
+
+            # Prépare un sprite de secours (marche partout)
+            if self._bg_tex is not None:
+                self._bg_sprite = arcade.Sprite()
+                self._bg_sprite.texture = self._bg_tex
+                self._bg_sprite.left = 0
+                self._bg_sprite.bottom = 0
+            else:
+                self._bg_sprite = None
+
+            self._bg_ready = True
+
+        # Rien à dessiner ?
+        if self._bg_tex is None:
+            return
+
+        w, h = self._bg_tex.width, self._bg_tex.height
+
+        # 1) Arcade 2.x : draw_lrwh_rectangle_textured existe
+        if hasattr(arcade, "draw_lrwh_rectangle_textured"):
+            arcade.draw_lrwh_rectangle_textured(self.world_left, self.world_right, 0, h, self._bg_tex)
+            return
+
+        # 2) Arcade 3.x : dessiner le Sprite
+        if self._bg_sprite is not None:
+            self._bg_sprite.left = self.world_left
+            self._bg_sprite.bottom = 0
+            self._bg_sprite.draw()
+
+
     def draw_betting_interface(self):
         # Interface de paris en overlay
         betting_info = self.mission_system.get_betting_info()
@@ -158,101 +294,63 @@ class MainScene(arcade.View):
             (0, 0, 0, 150)
         )
         
-        # Panneau central
-        panel_left = SCREEN_WIDTH // 2 - 320
-        panel_right = SCREEN_WIDTH // 2 + 320
-        panel_bottom = SCREEN_HEIGHT // 2 - 220
-        panel_top = SCREEN_HEIGHT // 2 + 220
-        arcade.draw_lrbt_rectangle_filled(panel_left, panel_right, panel_bottom, panel_top, (20, 20, 30, 230))
-        arcade.draw_lrbt_rectangle_outline(panel_left, panel_right, panel_bottom, panel_top, arcade.color.GOLD, 3)
-        
         # Titre
         arcade.draw_text(
             "STATION DE PARIS",
-            SCREEN_WIDTH // 2, panel_top - 40,
+            SCREEN_WIDTH // 2, SCREEN_HEIGHT - 100,
             arcade.color.GOLD, 32, anchor_x="center", bold=True
         )
         
         # Informations de la mission
         arcade.draw_text(
             f"Mission: {betting_info['mission_name']}",
-            SCREEN_WIDTH // 2, panel_top - 90,
+            SCREEN_WIDTH // 2, SCREEN_HEIGHT - 150,
             arcade.color.WHITE, 20, anchor_x="center"
         )
         
         # Statistiques du héros
         arcade.draw_text(
             f"Progression: {betting_info['mission_progress']:.1f}%",
-            SCREEN_WIDTH // 2, panel_top - 120,
+            SCREEN_WIDTH // 2, SCREEN_HEIGHT - 180,
             arcade.color.LIGHT_BLUE, 16, anchor_x="center"
         )
         
         arcade.draw_text(
             f"Vie: {betting_info['hero_health']:.1f}%",
-            SCREEN_WIDTH // 2, panel_top - 140,
+            SCREEN_WIDTH // 2, SCREEN_HEIGHT - 200,
             arcade.color.GREEN, 16, anchor_x="center"
+        )
+        
+        arcade.draw_text(
+            f"Endurance: {betting_info['hero_stamina']:.1f}%",
+            SCREEN_WIDTH // 2, SCREEN_HEIGHT - 220,
+            arcade.color.BLUE, 16, anchor_x="center"
         )
         
         # Options de pari
         arcade.draw_text(
             "Sur quoi voulez-vous parier ?",
-            SCREEN_WIDTH // 2, panel_top - 200,
+            SCREEN_WIDTH // 2, SCREEN_HEIGHT - 280,
             arcade.color.WHITE, 18, anchor_x="center"
         )
         
         # Boutons de pari
         arcade.draw_text(
-            "1 - RÉUSSITE de la mission (x2)",
-            SCREEN_WIDTH // 2, panel_top - 240,
+            "1 - RÉUSSITE de la mission (x2 gains)",
+            SCREEN_WIDTH // 2, SCREEN_HEIGHT - 320,
             arcade.color.GREEN, 16, anchor_x="center"
         )
         
         arcade.draw_text(
-            "2 - ÉCHEC de la mission (x2)",
-            SCREEN_WIDTH // 2, panel_top - 270,
+            "2 - ÉCHEC de la mission (x2 gains)",
+            SCREEN_WIDTH // 2, SCREEN_HEIGHT - 350,
             arcade.color.RED, 16, anchor_x="center"
         )
         
         arcade.draw_text(
             "3 - Annuler",
-            SCREEN_WIDTH // 2, panel_top - 300,
+            SCREEN_WIDTH // 2, SCREEN_HEIGHT - 380,
             arcade.color.GRAY, 16, anchor_x="center"
-        )
-        
-        # Sélection courante
-        sel = betting_info['temp_bet_type'] or "—"
-        arcade.draw_text(
-            f"Sélection: {sel}",
-            SCREEN_WIDTH // 2, panel_bottom + 120,
-            arcade.color.WHITE, 18, anchor_x="center"
-        )
-        
-        # Montant à parier + contrôles
-        arcade.draw_text(
-            f"Montant: {betting_info['temp_bet_amount']} (←/→ pour ajuster)",
-            SCREEN_WIDTH // 2, panel_bottom + 90,
-            arcade.color.GOLD, 18, anchor_x="center"
-        )
-        
-        # Solde
-        arcade.draw_text(
-            f"Solde: {betting_info['gold']}",
-            SCREEN_WIDTH // 2, panel_bottom + 60,
-            arcade.color.LIGHT_GRAY, 16, anchor_x="center"
-        )
-        
-        # Validation
-        arcade.draw_text(
-            "ENTRÉE - Valider le pari",
-            SCREEN_WIDTH // 2, panel_bottom + 30,
-            arcade.color.LIGHT_GREEN, 16, anchor_x="center"
-        )
-        
-        # Aide
-        arcade.draw_text(
-            "1=Succès  2=Échec  3=Annuler  ←/→=Montant  Entrée=OK",
-            SCREEN_WIDTH // 2, panel_bottom + 10,
-            arcade.color.LIGHT_GRAY, 12, anchor_x="center"
         )
         
         # Instructions
@@ -326,24 +424,13 @@ class MainScene(arcade.View):
     
     def handle_betting_input(self, key):
         # Gérer les entrées pour l'interface de paris
-        info = self.mission_system.get_betting_info()
-        if not info:
-            return
-        
         if key == arcade.key.KEY_1:
-            self.mission_system.temp_bet_type = "success"
+            # Parier sur la réussite
+            result = self.mission_system.place_bet("success", 100)  # 100 crédits par défaut
+            print(result)
         elif key == arcade.key.KEY_2:
-            self.mission_system.temp_bet_type = "failure"
-        elif key == arcade.key.LEFT:
-            self.mission_system.temp_bet_amount = max(0, self.mission_system.temp_bet_amount - 10)
-        elif key == arcade.key.RIGHT:
-            self.mission_system.temp_bet_amount = min(self.mission_system.gold, self.mission_system.temp_bet_amount + 10)
-        elif key == arcade.key.ENTER or key == arcade.key.RETURN:
-            if not self.mission_system.temp_bet_type:
-                print("Choisissez d'abord Succès (1) ou Échec (2)")
-                return
-            amount = self.mission_system.temp_bet_amount
-            result = self.mission_system.place_bet(self.mission_system.temp_bet_type, amount)
+            # Parier sur l'échec
+            result = self.mission_system.place_bet("failure", 100)  # 100 crédits par défaut
             print(result)
         elif key == arcade.key.KEY_3:
             # Annuler
@@ -363,6 +450,14 @@ class MainScene(arcade.View):
             
             # Mettre à jour la section du vaisseau selon la position de l'agent
             self.update_ship_section()
+
+            # Mettre à jour le message flottant (animation + durée ~2s)
+            if self.floating_message:
+                self.floating_message['y'] += 1
+                self.floating_message['frames'] = self.floating_message.get('frames', 0) + 1
+                # ~2 secondes à 60 FPS
+                if self.floating_message['frames'] >= 120:
+                    self.floating_message = None
             
             # Debug: Vérifier l'état de la MISSION PRINCIPALE DU HÉROS
             if self.mission_system.bet_placed and not self.mission_system.bet_result:
@@ -403,12 +498,8 @@ class MainScene(arcade.View):
                 self.mission_system.calculate_bet_result()
                 print("Résultat du pari calculé - Écran de surveillance fermé (détection update) !")
 
-            if getattr(self, '_floating_message', None):
-              msg = self._floating_message
-              msg['y'] += 1  # bouge vers le haut
-              msg['frames'] += 1
-              if msg['frames'] > 120: # dure 2 seconde 
-                  self._floating_message = None
+            # Mettre à jour la caméra APRÈS toutes les mises à jour
+            self.update_camera()
     
     def update_ship_section(self):
         # Déterminer la section du vaisseau selon la position de l'agent
@@ -418,6 +509,23 @@ class MainScene(arcade.View):
             self.current_ship_section = 1  # Centre
         else:
             self.current_ship_section = 2  # Arrière
+    
+    def update_camera(self):
+        # Suivi fluide: Camera2D.position représente le CENTRE de la caméra
+        half_w = SCREEN_WIDTH / 2
+        half_h = SCREEN_HEIGHT / 2
+
+        # Cibler le centre sur l'agent en X
+        target_center_x = max(self.world_left + half_w, min(self.world_right - half_w, self.agent.center_x))
+        # Verrou vertical: garder le bas du monde (ou sol) aligné avec le bas de l'écran
+        target_center_y = half_h
+
+        # Easing vers la cible
+        current_x, current_y = self.camera.position
+        ease = 0.18
+        new_x = current_x + (target_center_x - current_x) * ease
+        new_y = current_y + (target_center_y - current_y) * ease
+        self.camera.position = (new_x, new_y)
     
     def on_key_press(self, key, modifiers):
         if key == arcade.key.ESCAPE:
@@ -442,25 +550,11 @@ class MainScene(arcade.View):
             # Transmettre les contrôles à l'agent seulement
             self.agent.on_key_release(key, modifiers)
 
-def trigger_repair_screen(self):
-        def on_finish(success):
-            self.window.show_view(self)
-            if success:
-                self.show_floating_message("Écran connecté avec succès !", arcade.color.GREEN)
-            else:
-                self.show_floating_message("Connexion échouée !", arcade.color.RED)
-        self._floating_message = None
-        self.window.show_view(RepairScreenGame(on_finish_callback=on_finish))
-
-def show_floating_message(self, text, color):
-        self._floating_message = {
-            'text': text,
+    # API simple pour déclencher un message flottant depuis d'autres systèmes
+    def show_floating_message(self, text, color=arcade.color.WHITE):
+        self.floating_message = {
+            'text': str(text),
             'color': color,
-            'y': 100,
-            'frames': 0
+            'y': SCREEN_HEIGHT // 2,
+            'frames': 0,
         }
-
-#dans on_draw() methode, pour afficher le floating message
-    
-#dans on_update() methode, pour mettre a jour le floating message
- 
