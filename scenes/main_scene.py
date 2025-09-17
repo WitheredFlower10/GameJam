@@ -6,6 +6,8 @@ from entities.ship import Ship
 from entities.mission_system import MissionSystem
 from entities.surveillance_screen import SurveillanceScreen
 
+from mini_games.terminal import MainTerminal
+
 
 class MainScene(arcade.View):
     
@@ -49,9 +51,17 @@ class MainScene(arcade.View):
         # Dimensions UI adaptatives (initialisées aux valeurs par défaut)
         self.ui_width = SCREEN_WIDTH
         self.ui_height = SCREEN_HEIGHT
+
+        # Terminal principal
+        self.terminal = None
         
         self.setup()
     
+    def on_text(self, text):
+        if self.terminal and hasattr(self.terminal, 'on_text'):
+            self.terminal.on_text(text)
+            return
+
     def on_resize_event(self, width, height):
         """Appelé quand la fenêtre change de taille (toggle fullscreen)"""
         print(f"MainScene - Redimensionnement détecté: {width}x{height}")
@@ -216,6 +226,11 @@ class MainScene(arcade.View):
         self.gui_camera.use()
         self.draw_floating_message()
         self.draw_ui()
+
+        # Afficher le terminal si initialisé
+        if self.terminal:
+            self.terminal.on_draw()
+            
     
     def draw_ui(self):
         # Titre
@@ -599,6 +614,9 @@ class MainScene(arcade.View):
             pass
     
     def on_key_press(self, key, modifiers):
+        if self.terminal:
+            self.terminal.on_key_press(key, modifiers)
+            return
         if key == arcade.key.ESCAPE:
             # Réactiver le toggle fullscreen
             if hasattr(self.window, 'enable_fullscreen_toggle'):
@@ -608,6 +626,13 @@ class MainScene(arcade.View):
             from scenes.menu_scene import MenuScene
             menu_scene = MenuScene()
             self.window.show_view(menu_scene)
+        elif key == arcade.key.TAB:
+            #### Test fonction Ouvrir le terminal
+            if self.terminal:
+                pass
+            else:
+                self.terminal = MainTerminal(self.window, on_exit_callback=self.close_terminal)
+                print("Terminal ouvert.")
         elif self.mission_system.betting_active:
             # Gérer l'interface de paris
             self.handle_betting_input(key)
@@ -633,3 +658,8 @@ class MainScene(arcade.View):
             'y': SCREEN_HEIGHT // 2,
             'frames': 0,
         }
+
+    def close_terminal(self):
+        if self.terminal:
+            self.terminal = None
+            print("Terminal fermé.")
