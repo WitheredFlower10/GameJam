@@ -8,34 +8,35 @@ class MenuScene(arcade.View):
     def __init__(self):
         super().__init__()
         
-        # Couleurs et styles
-        self.title_color = arcade.color.GOLD
-        self.subtitle_color = arcade.color.WHITE
-        self.button_color = arcade.color.BLUE
-        self.button_hover_color = arcade.color.LIGHT_BLUE
+        # Couleurs futuristes
+        self.title_color = (44,86,110)       
+        self.subtitle_color = (180, 180, 255)  
+        self.option_color = (147,150,185)  
+        self.option_hover_color = (85,106,161) 
         self.background_color = arcade.color.BLACK
+        
+        #Son
+        self.sound_back = arcade.load_sound("assets/sounds/menu_back.wav")
+        self.sound_enabled = True
+
         
         # État du menu
         self.selected_option = 0
         self.menu_options = [
-            "Commencer la Mission",
-            "Instructions",
-            "Quitter"
+            "▶ Démarrer l’Opération",
+            "📜 Manuel Galactique",
+            "✖ Éjecter du Système"
         ]
         
         # Animation
         self.animation_timer = 0
-        self.title_scale = 1.0
-        self.title_scale_direction = 1
-        
-        # Sons (optionnel)
-        self.sound_enabled = True
+        self.fade_alpha = 255  # Fondu au démarrage
     
     def on_draw(self):
         self.clear()
         
-        # Fond étoilé
-        self.draw_starfield()
+        # Fond spatial
+        self.draw_space_background()
         
         # Titre du jeu
         self.draw_title()
@@ -43,117 +44,99 @@ class MenuScene(arcade.View):
         # Options du menu
         self.draw_menu_options()
         
-        # Instructions de contrôle
+        # Instructions
         self.draw_controls()
         
         # Version
         arcade.draw_text("Version 1.0 - Game Jam 2025", 
-                        10, 10, arcade.color.GRAY, 12)
-    
-    def draw_starfield(self):
-        # Dessiner un champ d'étoiles animé
-        import random
-        random.seed(42)  # Pour des étoiles fixes
+                        10, 10, (150, 150, 150), 12)
         
-        for i in range(100):
-            x = (i * 37) % SCREEN_WIDTH
+        # Effet fondu
+        if self.fade_alpha > 0:
+            arcade.draw_lrbt_rectangle_filled(
+                0, SCREEN_WIDTH, 0, SCREEN_HEIGHT,
+                (0, 0, 0, int(self.fade_alpha))
+            )
+    
+    def draw_space_background(self):
+        """ Fond étoilé coloré avec effet galaxie """
+        for i in range(200):
+            x = (i * 37 + int(self.animation_timer * 1.5)) % SCREEN_WIDTH
             y = (i * 73) % SCREEN_HEIGHT
-            brightness = (i * 17) % 255
-            
-            # Animation des étoiles
-            twinkle = int(128 + 127 * math.sin(self.animation_timer * 0.01 + i * 0.1))
-            color = (twinkle, twinkle, twinkle)
-            
-            arcade.draw_circle_filled(x, y, 1, color)
+            size = 1 + (i % 3)
+            # Couleurs variées pour un effet cosmique
+            if i % 5 == 0:
+                color = (200, 200, 255)  # bleu clair
+            elif i % 3 == 0:
+                color = (255, 150, 255)  # violet
+            else:
+                twinkle = int(128 + 127 * math.sin(self.animation_timer * 0.05 + i))
+                color = (twinkle, twinkle, twinkle)
+            arcade.draw_circle_filled(x, y, size, color)
+        
+        # Effet "scanlines" rétro
+        for y in range(0, SCREEN_HEIGHT, 4):
+            arcade.draw_line(0, y, SCREEN_WIDTH, y, (0, 0, 0, 40), 1)
     
     def draw_title(self):
-        # Titre principal avec animation
         title_x = SCREEN_WIDTH // 2
-        title_y = SCREEN_HEIGHT - 150
+        title_y = SCREEN_HEIGHT - 120
         
-        # Animation de pulsation
-        self.animation_timer += 1
-        if self.animation_timer % 60 == 0:
-            self.title_scale_direction *= -1
+        # Zoom + oscillation
+        scale = 1.0 + 0.08 * math.sin(self.animation_timer * 0.05)
+        glow = 0
         
-        self.title_scale += self.title_scale_direction * 0.01
-        self.title_scale = max(0.9, min(1.1, self.title_scale))
-        
-        # Titre principal
+        # Titre principal avec halo
         arcade.draw_text(
-            "THE OBSERVER PROTOCOL",
+            "The Observer Protocol",
             title_x, title_y,
-            self.title_color, 48,
+            (0, glow, 255), int(54 * scale),
             anchor_x="center",
             bold=True
+        )
+        
+        # Sous-titre
+        arcade.draw_text(
+            "Centre de Commande Intergalactique",
+            title_x, title_y - 60,
+            self.subtitle_color, 20,
+            anchor_x="center"
         )
     
     def draw_menu_options(self):
         start_y = SCREEN_HEIGHT // 2 + 50
-        option_height = 60
+        option_height = 70
         
         for i, option in enumerate(self.menu_options):
             y_pos = start_y - (i * option_height)
             
-            # Couleur de l'option sélectionnée
             if i == self.selected_option:
-                color = self.button_hover_color
-                # Effet de surbrillance
+                # Pulsation néon
+                pulse = 150 + 100 * math.sin(self.animation_timer * 0.1)
+                color = self.option_hover_color
+                glow_color = (color[0], color[1], color[2], int(pulse))
                 arcade.draw_lrbt_rectangle_filled(
-                    SCREEN_WIDTH // 2 - 150, SCREEN_WIDTH // 2 + 150,
-                    y_pos - 20, y_pos + 20,
-                    (color[0], color[1], color[2], 50)
+                    SCREEN_WIDTH // 2 - 220, SCREEN_WIDTH // 2 + 220,
+                    y_pos - 30, y_pos + 30,
+                    glow_color
                 )
             else:
-                color = self.subtitle_color
+                color = self.option_color
             
-            # Texte de l'option
             arcade.draw_text(
                 option,
                 SCREEN_WIDTH // 2, y_pos,
-                color, 24,
+                color, 26,
                 anchor_x="center",
                 bold=(i == self.selected_option)
             )
-            
-            # Indicateur de sélection
-            if i == self.selected_option:
-                arcade.draw_text(
-                    ">",
-                    SCREEN_WIDTH // 2 - 150, y_pos,
-                    self.button_color, 24,
-                    anchor_x="center"
-                )
-                arcade.draw_text(
-                    "<",
-                    SCREEN_WIDTH // 2 + 150, y_pos,
-                    self.button_color, 24,
-                    anchor_x="center"
-                )
     
     def draw_controls(self):
-        # Instructions de contrôle
         controls_y = 120
-        
         arcade.draw_text(
-            "Contrôles:",
+            "Naviguez avec ↑↓  |  Validez avec ENTRÉE",
             SCREEN_WIDTH // 2, controls_y,
-            arcade.color.WHITE, 18,
-            anchor_x="center",
-            bold=True
-        )
-        
-        arcade.draw_text(
-            "↑↓ - Naviguer dans le menu",
-            SCREEN_WIDTH // 2, controls_y - 25,
-            arcade.color.LIGHT_GRAY, 14,
-            anchor_x="center"
-        )
-        
-        arcade.draw_text(
-            "ENTRÉE - Sélectionner",
-            SCREEN_WIDTH // 2, controls_y - 45,
-            arcade.color.LIGHT_GRAY, 14,
+            (180, 180, 180), 16,
             anchor_x="center"
         )
     
@@ -168,23 +151,23 @@ class MenuScene(arcade.View):
             arcade.exit()
     
     def select_option(self):
-        if self.selected_option == 0:  # Commencer la Mission
+        if self.selected_option == 0:  # Démarrer
             from scenes.main_scene import MainScene
             game_scene = MainScene()
             self.window.show_view(game_scene)
-        elif self.selected_option == 1:  # Instructions
+        elif self.selected_option == 1:  # Manuel
             self.show_instructions()
         elif self.selected_option == 2:  # Quitter
             arcade.exit()
     
     def show_instructions(self):
-        # Créer une vue d'instructions
         instructions_view = InstructionsView()
         self.window.show_view(instructions_view)
     
     def on_update(self, delta_time):
-        # Mettre à jour l'animation
         self.animation_timer += delta_time * 60
+        if self.fade_alpha > 0:
+            self.fade_alpha -= delta_time * 200
 
 
 class InstructionsView(arcade.View):
@@ -196,72 +179,64 @@ class InstructionsView(arcade.View):
     def on_draw(self):
         self.clear()
         
-        # Titre
         arcade.draw_text(
-            "INSTRUCTIONS",
+            "📜 MANUEL GALACTIQUE",
             SCREEN_WIDTH // 2, SCREEN_HEIGHT - 100,
-            arcade.color.GOLD, 36,
+            (0, 255, 220), 32,
             anchor_x="center",
             bold=True
         )
         
-        # Instructions
         instructions = [
-            "Vous êtes un Agent de Missions galactique.",
+            "Bienvenue Agent ! Voici vos directives :",
             "",
-            "Votre rôle:",
-            "• Distribuer des missions aux héros",
-            "• Surveiller leur progression",
-            "• Gérer les interactions dans le vaisseau",
+            "🎯 Votre mission :",
+            "• Assigner des quêtes aux héros interstellaires",
+            "• Superviser leur progression depuis la base",
+            "• Maintenir l’ordre dans le vaisseau",
             "",
-            "Contrôles:",
-            "• FLÈCHES: Se déplacer dans le vaisseau",
-            "• ESPACE: Interagir avec les points d'intérêt",
+            "🎮 Contrôles :",
+            "• FLÈCHES : Déplacer votre avatar",
+            "• ESPACE : Interagir avec un terminal",
             "",
-            "Surveillance:",
-            "• L'écran central montre la mission du héros",
-            "• Les héros agissent automatiquement",
-            "• Vous pouvez améliorer la surveillance",
+            "🛰️ Surveillance :",
+            "• L’écran central affiche la mission en cours",
+            "• Les héros agissent seuls, mais vous pouvez",
+            "  influencer leur réussite par vos choix",
             "",
-            "Objectif:",
-            "• Remplir vos tâches administratives",
-            "• Surveiller les héros en mission",
-            "• Parier sur leur réussite"
+            "🏆 Objectif final :",
+            "• Accomplir vos tâches administratives",
+            "• Maximiser la réussite des missions",
+            "• Devenir l’agent de l’année galactique"
         ]
         
-        y_pos = SCREEN_HEIGHT - 150
-        for instruction in instructions:
-            if instruction == "":
-                y_pos -= 20
+        y_pos = SCREEN_HEIGHT - 160
+        for line in instructions:
+            if line == "":
+                y_pos -= 15
                 continue
             
             color = arcade.color.WHITE
             size = 16
-            
-            if instruction.startswith("•"):
-                color = arcade.color.LIGHT_BLUE
+            if line.startswith("•"):
+                color = (200, 200, 255)
                 size = 14
-            elif instruction.endswith(":"):
-                color = arcade.color.YELLOW
+            elif line.startswith("🎯") or line.startswith("🎮") or line.startswith("🛰️") or line.startswith("🏆"):
+                color = (255, 200, 0)
                 size = 18
-                instruction = instruction.upper()
             
-            arcade.draw_text(
-                instruction,
-                50, y_pos,
-                color, size
-            )
+            arcade.draw_text(line, 60, y_pos, color, size)
             y_pos -= 25
         
-        # Retour au menu
         arcade.draw_text(
-            "Appuyez sur ÉCHAP pour retourner au menu",
+            "⟵ ÉCHAP pour retourner au menu",
             SCREEN_WIDTH // 2, 50,
-            arcade.color.LIGHT_GRAY, 16,
+            (180, 180, 180), 16,
             anchor_x="center"
         )
     
     def on_key_press(self, key, modifiers):
         if key == arcade.key.ESCAPE:
             menu_scene = MenuScene()
+            arcade.play_sound(menu_scene.sound_back)
             self.window.show_view(menu_scene)
