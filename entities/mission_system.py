@@ -1,5 +1,6 @@
 import random
-from utils.constants import MISSION_DURATION
+from utils.constants import MISSION_DURATION, CREDIT_INITIAL
+from mini_games.terminal import MainTerminal
 
 
 class MissionSystem:
@@ -18,7 +19,7 @@ class MissionSystem:
         self.bet_result = None
         
         # Économie
-        self.gold = 0
+        self.gold=CREDIT_INITIAL
         
         # État temporaire pour l'UI de pari
         self.temp_bet_type = None
@@ -26,6 +27,9 @@ class MissionSystem:
 
         # Ordonnancement des missions
         self.missions_assigned_count = 0
+
+        self.terminal_on = False
+
         
         self.create_mission_templates()
     
@@ -168,6 +172,8 @@ class MissionSystem:
                 return "Interface de paris ouverte !"
         elif point_name == "Analyse de Données":
             return "Données analysées !"
+        elif point_name == "Terminal":
+            self.terminal_on = True
         else:
             return "Interaction effectuée."
     

@@ -49,6 +49,9 @@ HERO_STATE_FIGHTING = "fighting"
 HERO_STATE_COMPLETED = "completed"
 HERO_STATE_FAILED = "failed"
 
+# Crédits initiaux du joueur
+CREDIT_INITIAL = 20
+
 # --- Constantes de Bataille Galactique ---
 PLAYER_SCALING = 0.5
 ENEMY_SCALING = 0.5

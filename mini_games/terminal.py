@@ -10,13 +10,14 @@ MENU_OPTIONS = [
 ]
 
 class MainTerminal:
-    def __init__(self, window, on_select_callback=None, on_exit_callback=None, screen_connected=False):
+    def __init__(self, window, on_select_callback=None, on_exit_callback=None, screen_connected=False, gold=None):
         self.window = window
         self.selected_index = 0
         self.on_select_callback = on_select_callback
         self.on_exit_callback = on_exit_callback
         self.font_terminal = "ByteBounce"
         self.screen_connected = screen_connected
+        self.gold = gold
     # Sous-état : None (menu principal), 'fortune', 'repair', 'info'
         self.sub_view = None
     # État pour l'affichage des informations achetées
@@ -27,28 +28,28 @@ class MainTerminal:
     # État du chat du futur
         self.fortune_state = {
             'lines': [], 'input_text': '', 'result': '', 'state': 'asking', 'current_question': '', 'question_list': [
-                "Quel est ton rêve préféré?",
-                "Si tu pouvais voyager n'importe où, où irais-tu?",
-                "Quel animal aimerais-tu être?",
+                "Quel est ton reve prefere?",
+                "Si tu pouvais voyager n'importe ou, ou irais-tu?",
+                "Quel animal aimerais-tu etre?",
                 "Quelle est ta couleur porte-bonheur?",
-                "Quel est le prénom de ton premier ami?",
+                "Quel est le prenom de ton premier ami?",
                 "Quel est le dernier film que tu as vu?",
                 "Quel plat te rend heureux?",
-                "Quelle chanson écoutes-tu en boucle?",
+                "Quelle chanson ecoutes-tu en boucle?",
                 "Si tu pouvais avoir un super-pouvoir, lequel choisirais-tu?",
                 "Quel est le plus beau souvenir de ton enfance?"
             ],
             'fortune_results': [
                 "Le vent souffle en faveur de l'adversaire aujourd'hui...",
-                "L'ombre de l'ennemi semble légère, c'est le moment d'agir.",
+                "L'ombre de l'ennemi semble legere, c'est le moment d'agir.",
                 "Une force tranquille habite ton héros en ce jour.",
                 "Un voile de fatigue effleure ton champion, la prudence est de mise.",
-                "L'adversaire hésite, ses pas sont incertains.",
-                "L'énergie circule librement dans les veines de ton héros.",
-                "Un défi de taille se profile à l'horizon, l'ennemi n'est pas à sous-estimer.",
-                "La confiance rayonne autour de ton héros, rien ne semble impossible.",
-                "L'adversaire se tient droit, prêt à tout, reste vigilant.",
-                "La victoire semble sourire à ton héros, mais le destin reste mystérieux."
+                "L'adversaire hesite, ses pas sont incertains.",
+                "L'energie circule librement dans les veines de ton heros.",
+                "Un defi de taille se profile a l'horizon, l'ennemi n'est pas a sous-estimer.",
+                "La confiance rayonne autour de ton heros, rien ne semble impossible.",
+                "L'adversaire se tient droit, pret a tout, reste vigilant.",
+                "La victoire semble sourire a ton heros, mais le destin reste mysterieux."
             ]
         }
     # État de l'écran de réparation
@@ -70,6 +71,11 @@ class MainTerminal:
             return ["Ecran deja connecte"] + MENU_OPTIONS[1:]
         else:
             return MENU_OPTIONS
+    
+    def show_insufficient_funds(self):
+        self.sub_view = 'notice'
+        self.info_state['lines'] = ["Fonds insuffisants pour cette action."]
+        self.info_state['state'] = 'showing'
 
 
 
@@ -91,6 +97,10 @@ class MainTerminal:
 
     # Affichage des informations achetées
         if self.sub_view == 'info':
+            self._draw_info(x, y, w, h, term_green, font_terminal)
+            return
+        
+        if self.sub_view == 'notice':
             self._draw_info(x, y, w, h, term_green, font_terminal)
             return
 
@@ -128,6 +138,12 @@ class MainTerminal:
             if key in (arcade.key.ENTER, arcade.key.RETURN, arcade.key.ESCAPE):
                 self.sub_view = None
             return
+        
+        elif self.sub_view == 'notice':
+            # Retour au menu principal avec Entrée ou Échap
+            if key in (arcade.key.ENTER, arcade.key.RETURN, arcade.key.ESCAPE):
+                self.sub_view = None
+            return
 
         max_index = len(self.menu_options) - 1
         if key == arcade.key.UP:
@@ -158,6 +174,10 @@ class MainTerminal:
             if not (self.screen_connected and self.selected_index == 0):
                 # Ouvrir le chat du futur
                 if self.menu_options[self.selected_index].startswith("Chat du futur"):
+                    if self.gold is not None and self.gold < 20:
+                        self.show_insufficient_funds()
+                        return
+                    self.gold -= 20
                     self._reset_fortune()
                     self.sub_view = 'fortune'
                 # Ouvrir l'écran de réparation
@@ -166,6 +186,10 @@ class MainTerminal:
                     self.sub_view = 'repair'
                 # Ouvrir l'affichage des informations achetées
                 elif self.menu_options[self.selected_index].startswith("Achat des infos"):
+                    if self.gold is not None and self.gold < 200:
+                        self.show_insufficient_funds()
+                        return
+                    self.gold -= 200
                     self._reset_info()
                     self.sub_view = 'info'
                 elif self.on_select_callback:
@@ -193,7 +217,7 @@ class MainTerminal:
     # Affichage
         arcade.draw_lrbt_rectangle_filled(x, x+w, y, y+h, (0, 0, 0, 230))
         arcade.draw_lrbt_rectangle_outline(x, x+w, y, y+h, term_green, 2)
-        arcade.draw_text("Informations Achetees", x+18, y+h-38, term_green, 18, font_name=font_terminal, bold=True)
+        arcade.draw_text("Notice", x+18, y+h-38, term_green, 18, font_name=font_terminal, bold=True)
         option_gap = 22
         max_lines = 9
         y_draw = y+h-70
