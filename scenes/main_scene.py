@@ -32,6 +32,14 @@ class MainScene(arcade.View):
         self.current_ship_section = 1
         self.surveillance_was_displayed = False
         
+        # Image de fond
+        self.background_texture = None
+        self.background_width = SCREEN_WIDTH  # Sera mis à jour selon la taille de l'image
+        
+        # Système de défilement
+        self.camera_x = 0  # Position de la caméra
+        self.world_width = SCREEN_WIDTH * 3  # Largeur du monde (3 écrans par défaut)
+        
         self.setup()
     
     def setup(self):
@@ -41,8 +49,9 @@ class MainScene(arcade.View):
         
         # Initialiser les entités
         self.agent = Agent()
-        self.agent.center_x = SCREEN_WIDTH // 2
-        self.agent.center_y = 100
+        # Positionner l'agent au centre du monde (sera ajusté après chargement du background)
+        self.agent.center_x = self.world_width // 2
+        self.agent.center_y = SCREEN_HEIGHT // 2  # Centre de l'écran verticalement
         self.agent_list.append(self.agent)
         
         self.hero = Hero()
@@ -56,13 +65,40 @@ class MainScene(arcade.View):
         self.camera = arcade.camera.Camera2D()
         self.gui_camera = arcade.camera.Camera2D()
         
+        # Initialiser la position de la caméra
+        self.update_camera_initial()
+        
         # Lier les systèmes
         self.mission_system.set_hero(self.hero)
         self.surveillance_screen.set_hero(self.hero)
         self.agent.set_mission_system(self.mission_system)
+        self.agent.set_world_width(self.world_width)
         
         # Passer les points d'interaction du vaisseau au système de missions
         self.mission_system.set_ship_interaction_points(self.ship.get_interaction_points())
+        
+        # Charger l'image de fond (optionnelle)
+        try:
+            self.background_texture = arcade.load_texture("assets/background.png")
+            # Mettre à jour la largeur du monde selon la taille de l'image
+            if self.background_texture:
+                self.background_width = self.background_texture.width
+                # Le monde fait exactement la même largeur que le background
+                self.world_width = self.background_width
+                # Mettre à jour la largeur du monde de l'agent
+                self.agent.set_world_width(self.world_width)
+                # Repositionner l'agent au début du monde pour test
+                self.agent.center_x = SCREEN_WIDTH // 2  # Commencer visible
+                # Mettre à jour immédiatement la caméra
+                self.update_camera_initial()
+                print(f"Background chargé: {self.background_width}px de large, monde: {self.world_width}px")
+        except FileNotFoundError:
+            print("Image de fond 'assets/background.png' non trouvée, utilisation de la couleur par défaut")
+            self.background_texture = None
+        
+        # Couleur d'arrière-plan (si pas d'image)
+        if not self.background_texture:
+            arcade.set_background_color(SHIP_COLOR)
         
         # Ne pas démarrer de mission automatiquement
         # La mission sera assignée via les interactions
@@ -70,13 +106,58 @@ class MainScene(arcade.View):
     def on_draw(self):
         self.clear()
         
-        # Dessiner le vaisseau et l'agent
+        # Utiliser la caméra pour le monde
         self.camera.use()
+        
+        # Dessiner l'image de fond si disponible avec défilement
+        if self.background_texture:
+            # Le background fait exactement la largeur du monde
+            # Position du background : il commence à x=0 dans les coordonnées du monde
+            bg_x = 0  # Position fixe dans le monde
+            
+            # Calculer la hauteur du background en gardant les proportions
+            bg_ratio = self.background_texture.height / self.background_texture.width
+            bg_height = self.background_width * bg_ratio
+            
+            # Si l'image est plus petite que l'écran, l'étirer à la hauteur de l'écran
+            if bg_height < SCREEN_HEIGHT:
+                bg_height = SCREEN_HEIGHT
+                
+            # Centrer verticalement
+            bg_y = (SCREEN_HEIGHT - bg_height) // 2
+            
+            # Dessiner l'image
+            arcade.draw_texture_rect(
+                self.background_texture,
+                arcade.LBWH(bg_x, bg_y, self.background_width, bg_height)
+            )
+        
+        # Dessiner le vaisseau et l'agent
         self.ship.draw()
         self.ship.draw_interaction_points()
         
-        # Dessiner les sprites
+        # Dessiner les sprites (agent au-dessus de tout)
         self.agent_list.draw()
+        
+        # Debug: Voir l'agent et le centrage (dans les coordonnées du monde)
+        if self.agent:
+            # Cercle rouge autour de l'agent pour le voir
+            arcade.draw_circle_outline(
+                self.agent.center_x, self.agent.center_y, 50, 
+                arcade.color.RED, 4
+            )
+            # Croix au centre de l'écran (en coordonnées du monde)
+            screen_center_x = self.camera_x + SCREEN_WIDTH // 2
+            arcade.draw_line(
+                screen_center_x - 30, SCREEN_HEIGHT // 2,
+                screen_center_x + 30, SCREEN_HEIGHT // 2,
+                arcade.color.YELLOW, 4
+            )
+            arcade.draw_line(
+                screen_center_x, SCREEN_HEIGHT // 2 - 30,
+                screen_center_x, SCREEN_HEIGHT // 2 + 30,
+                arcade.color.YELLOW, 4
+            )
         
         # Dessiner l'écran de surveillance seulement si une mission est active
         if self.mission_system.current_mission:
@@ -145,6 +226,19 @@ class MainScene(arcade.View):
         # Bouton retour au menu
         arcade.draw_text("ÉCHAP: Retour au menu", 
                         SCREEN_WIDTH - 200, 30, arcade.color.LIGHT_GRAY, 12)
+        
+        # Debug info
+        if self.agent:
+            arcade.draw_text(f"Agent: ({self.agent.center_x:.0f}, {self.agent.center_y:.0f})", 
+                           10, SCREEN_HEIGHT - 140, arcade.color.WHITE, 16)
+            arcade.draw_text(f"Camera: {self.camera_x:.0f}", 
+                           10, SCREEN_HEIGHT - 160, arcade.color.WHITE, 16)
+            arcade.draw_text(f"Centre écran: {self.camera_x + SCREEN_WIDTH // 2:.0f}", 
+                           10, SCREEN_HEIGHT - 180, arcade.color.YELLOW, 16)
+            arcade.draw_text(f"Fenêtre: {SCREEN_WIDTH}x{SCREEN_HEIGHT}", 
+                           10, SCREEN_HEIGHT - 200, arcade.color.LIGHT_BLUE, 16)
+            arcade.draw_text(f"Monde: {self.world_width}px", 
+                           10, SCREEN_HEIGHT - 220, arcade.color.LIGHT_GREEN, 16)
     
     def draw_betting_interface(self):
         # Interface de paris en overlay
@@ -364,6 +458,9 @@ class MainScene(arcade.View):
             # Mettre à jour la section du vaisseau selon la position de l'agent
             self.update_ship_section()
             
+            # Mettre à jour la position de la caméra
+            self.update_camera()
+            
             # Debug: Vérifier l'état de la MISSION PRINCIPALE DU HÉROS
             if self.mission_system.bet_placed and not self.mission_system.bet_result:
                 print(f"Debug - Pari placé: {self.mission_system.bet_placed}")
@@ -410,11 +507,46 @@ class MainScene(arcade.View):
               if msg['frames'] > 120: # dure 2 seconde 
                   self._floating_message = None
     
+    def update_camera(self):
+        # Calculer où devrait être la caméra pour centrer l'agent
+        target_camera_x = self.agent.center_x - SCREEN_WIDTH // 2
+        
+        # Limites de la caméra (ne pas dépasser les bords du monde)
+        min_camera_x = 0
+        max_camera_x = max(0, self.world_width - SCREEN_WIDTH)
+        
+        # Appliquer les limites
+        self.camera_x = max(min_camera_x, min(max_camera_x, target_camera_x))
+        
+        # Debug info (temporaire)
+        if hasattr(self, '_debug_counter'):
+            self._debug_counter += 1
+        else:
+            self._debug_counter = 0
+            
+        if self._debug_counter % 60 == 0:  # Print every second
+            print(f"Debug - Agent: ({self.agent.center_x:.1f}, {self.agent.center_y:.1f})")
+            print(f"Debug - Camera: {self.camera_x:.1f}, World: {self.world_width}, Screen: {SCREEN_WIDTH}")
+        
+        # Appliquer la position de la caméra
+        self.camera.position = (self.camera_x, 0)
+    
+    def update_camera_initial(self):
+        # Forcer la mise à jour initiale de la caméra pour centrer sur l'agent
+        target_camera_x = self.agent.center_x - SCREEN_WIDTH // 2
+        min_camera_x = 0
+        max_camera_x = max(0, self.world_width - SCREEN_WIDTH)
+        self.camera_x = max(min_camera_x, min(max_camera_x, target_camera_x))
+        self.camera.position = (self.camera_x, 0)
+        print(f"Caméra initialisée: agent à ({self.agent.center_x}, {self.agent.center_y}), caméra à {self.camera_x}")
+    
     def update_ship_section(self):
-        # Déterminer la section du vaisseau selon la position de l'agent
-        if self.agent.center_x < SCREEN_WIDTH // 3:
+        # Déterminer la section du vaisseau selon la position de l'agent dans le monde
+        world_section_width = self.world_width // 3
+        
+        if self.agent.center_x < world_section_width:
             self.current_ship_section = 0  # Avant
-        elif self.agent.center_x < 2 * SCREEN_WIDTH // 3:
+        elif self.agent.center_x < 2 * world_section_width:
             self.current_ship_section = 1  # Centre
         else:
             self.current_ship_section = 2  # Arrière
