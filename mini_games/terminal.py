@@ -97,7 +97,7 @@ class MainTerminal:
     # Menu principal
         arcade.draw_lrbt_rectangle_filled(x, x+w, y, y+h, (0, 0, 0, 230))
         arcade.draw_lrbt_rectangle_outline(x, x+w, y, y+h, term_green, 2)
-        arcade.draw_text("Terminal", x+18, y+h-38, term_green, 18, font_name=font_terminal, bold=True)
+        arcade.draw_text("Terminal", x+18, y+h-38, term_green, 25, font_name=font_terminal, bold=True)
         option_gap = 32
         for i, option in enumerate(self.menu_options):
             oy = y + h - 70 - i * option_gap
@@ -215,16 +215,16 @@ class MainTerminal:
             return
     # Le menu principal n'accepte pas de saisie texte
 
-    # -------- fortune chat 子界面 --------
+    # -------- fortune chat  --------
     def _draw_fortune(self, x, y, w, h, term_green, font_terminal):
         import textwrap
         state = self.fortune_state
-        # 初始化
+        # initialisation
         if not state['lines']:
             state['current_question'] = random.choice(state['question_list'])
             state['lines'].append(("bot", "Bienvenue sur FUTUREBOT. Je vais vous poser une question sur la force de l'ennemi ou de votre héros..."))
             state['lines'].append(("bot", state['current_question']))
-        # 绘制
+        # Dessin
         arcade.draw_lrbt_rectangle_filled(x, x+w, y, y+h, (0, 0, 0, 230))
         arcade.draw_lrbt_rectangle_outline(x, x+w, y, y+h, term_green, 2)
         arcade.draw_text("Future Chat", x+18, y+h-38, term_green, 18, font_name=font_terminal, bold=True)
@@ -284,7 +284,7 @@ class MainTerminal:
         self.fortune_state['state'] = 'asking'
         self.fortune_state['current_question'] = ''
 
-    # -------- repair screen 子界面 --------
+    # -------- repair screen  --------
     def _draw_repair(self, x, y, w, h, term_green, font_terminal):
         import textwrap
         state = self.repair_state
@@ -362,6 +362,7 @@ class MainTerminal:
             self._repair_log("Toutes les lettres sont revelees. Reparation reussie !")
             state['state'] = "finished"
             state['message'] = "Connexion reussie. Appuyez sur Entree pour revenir au terminal."
+            self.screen_connected = True
             return
         if state['attemps'] >= 15:
             self._repair_log("Échec : trop de tentatives.")
