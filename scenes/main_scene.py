@@ -9,6 +9,7 @@ from entities.surveillance_screen import SurveillanceScreen
 from mini_games.terminal import MainTerminal
 
 
+
 class MainScene(arcade.View):
     
     def __init__(self):
@@ -20,6 +21,7 @@ class MainScene(arcade.View):
         self.ship = None
         self.mission_system = None
         self.surveillance_screen = None
+        
         
         # SpriteLists pour le dessin
         self.agent_list = None
@@ -47,6 +49,8 @@ class MainScene(arcade.View):
         self.game_state = GAME_STATE_PLAYING
         self.current_ship_section = 1  # 0=Avant, 1=Centre, 2=Arrière
         self.surveillance_was_displayed = False
+        self.surveillance_screen_connected = False
+
         
         # Dimensions UI adaptatives (initialisées aux valeurs par défaut)
         self.ui_width = SCREEN_WIDTH
@@ -54,6 +58,10 @@ class MainScene(arcade.View):
 
         # Terminal principal
         self.terminal = None
+
+       
+
+       
         
         self.setup()
     
@@ -131,6 +139,9 @@ class MainScene(arcade.View):
         
         # Passer les points d'interaction du vaisseau au système de missions
         self.mission_system.set_ship_interaction_points(self.ship.get_interaction_points())
+
+
+
         
         # Ne pas démarrer de mission automatiquement
         # La mission sera assignée via les interactions
@@ -196,18 +207,20 @@ class MainScene(arcade.View):
         self.world_left = 0
         self.world_right = 4000  # Limite exacte du monde
 
+
     def on_draw(self):
         self.clear()
-        
+
         # Dessiner le vaisseau et l'agent
         self.camera.use()
         self.draw_background()
         self.ship.draw()
-        self.ship.draw_interaction_points()
-        
+        # Utiliser la caméra et la taille d'écran pour afficher correctement les flèches
+        self.ship.draw_interaction_points(self.camera, self.ui_width, self.ui_height)
+
         # Dessiner les sprites
         self.agent_list.draw()
-        
+
         # Dessiner l'écran de surveillance seulement si une mission est active
         if self.mission_system.current_mission:
             self.surveillance_screen.draw()
@@ -221,7 +234,7 @@ class MainScene(arcade.View):
                 if (self.mission_system.bet_placed and not self.mission_system.bet_result):
                     self.mission_system.calculate_bet_result()
                     print("Résultat du pari calculé - Écran de surveillance fermé !")
-        
+
         # Interface utilisateur
         self.gui_camera.use()
         self.draw_floating_message()
@@ -236,6 +249,11 @@ class MainScene(arcade.View):
         # Titre
         arcade.draw_text("Agent de Missions", 10, self.ui_height - 30, 
                         arcade.color.WHITE, 24, bold=True)
+        
+        # Crédits
+        
+        arcade.draw_text(f"Crédits: {self.mission_system.gold}", 
+                            10, self.ui_height - 60, arcade.color.GOLD, 18)
         
         # État de la mission
         if self.mission_system.current_mission:
@@ -559,6 +577,12 @@ class MainScene(arcade.View):
 
             # Mettre à jour la caméra APRÈS toutes les mises à jour
             self.update_camera()
+
+            if self.terminal:
+                self.mission_system.gold = self.terminal.gold
+            if not self.terminal and self.mission_system.terminal_on:
+                    self.terminal = MainTerminal(self.window, on_exit_callback=self.close_terminal, screen_connected=self.surveillance_screen_connected, gold=self.mission_system.gold)
+
     
 
     
@@ -631,7 +655,7 @@ class MainScene(arcade.View):
             if self.terminal:
                 pass
             else:
-                self.terminal = MainTerminal(self.window, on_exit_callback=self.close_terminal)
+                self.terminal = MainTerminal(self.window, on_exit_callback=self.close_terminal, screen_connected=self.surveillance_screen_connected, gold=self.mission_system.gold)
                 print("Terminal ouvert.")
         elif self.mission_system.betting_active:
             # Gérer l'interface de paris
@@ -661,5 +685,8 @@ class MainScene(arcade.View):
 
     def close_terminal(self):
         if self.terminal:
+            self.surveillance_screen_connected = self.terminal.screen_connected
+            self.mission_system.terminal_on = False
             self.terminal = None
             print("Terminal fermé.")
+            
