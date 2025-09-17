@@ -17,6 +17,16 @@ class MissionSystem:
         self.bet_placed = False
         self.bet_result = None
         
+        # Économie
+        self.gold = 0
+        
+        # État temporaire pour l'UI de pari
+        self.temp_bet_type = None
+        self.temp_bet_amount = 100
+
+        # Ordonnancement des missions
+        self.missions_assigned_count = 0
+        
         self.create_mission_templates()
     
     def create_mission_templates(self):
@@ -27,6 +37,14 @@ class MissionSystem:
                 'difficulty': 1,
                 'duration': 45,
                 'reward': 100
+            },
+            {
+                'name': 'Exploration Planétaire',
+                'description': "Explorer une planète et trouver un artefact",
+                'type': 'Exploration',
+                'difficulty': 2,
+                'duration': 60,
+                'reward': 150
             },
             {
                 'name': 'Exploration de Ruines',
@@ -64,12 +82,13 @@ class MissionSystem:
     
     def start_random_mission(self):
         if not self.current_mission:
-            # Forcer une mission d'élimination pour tester la bataille
-            elimination_missions = [m for m in self.available_missions if m.get('type') == 'Élimination']
-            if elimination_missions:
-                mission_template = elimination_missions[0]
+            # Première interaction: Exploration, seconde: Élimination (mission finale)
+            if self.missions_assigned_count == 0:
+                exploration = [m for m in self.available_missions if m.get('type') == 'Exploration']
+                mission_template = exploration[0] if exploration else random.choice(self.available_missions)
             else:
-                mission_template = random.choice(self.available_missions)
+                elimination = [m for m in self.available_missions if m.get('type') == 'Élimination']
+                mission_template = elimination[0] if elimination else random.choice(self.available_missions)
             
             self.current_mission = mission_template.copy()
             self.current_mission['progress'] = 0
@@ -77,6 +96,10 @@ class MissionSystem:
             
             if self.hero:
                 self.hero.start_mission(mission_template)
+            
+            # Récompense immédiate de vente de mission
+            self.gold += 100
+            self.missions_assigned_count += 1
             
             print(f"Mission '{self.current_mission['name']}' assignée au héros!")
     
@@ -140,6 +163,8 @@ class MissionSystem:
                 return "Un pari est déjà placé sur cette mission."
             else:
                 self.betting_active = True
+                self.temp_bet_type = None
+                self.temp_bet_amount = min(100, max(10, self.gold)) if self.gold > 0 else 0
                 return "Interface de paris ouverte !"
         elif point_name == "Analyse de Données":
             return "Données analysées !"
@@ -155,11 +180,17 @@ class MissionSystem:
             return "Aucune mission active."
         if self.bet_placed:
             return "Un pari est déjà placé."
+        if amount <= 0:
+            return "Montant invalide."
+        if amount > self.gold:
+            return "Fonds insuffisants."
         
         self.bet_type = bet_type  # "success" ou "failure"
         self.bet_amount = amount
         self.bet_placed = True
         self.betting_active = False
+        # Débiter immédiatement les fonds pariés
+        self.gold -= amount
         
         return f"Pari de {amount} crédits placé sur {bet_type} !"
     
@@ -199,11 +230,15 @@ class MissionSystem:
             self.bet_result['won'] = True
             self.bet_result['winnings'] = self.bet_amount * 2
             self.bet_result['message'] = f"🎉 PARI GAGNÉ ! 🎉\nVous aviez parié sur la RÉUSSITE\nMission de bataille du héros: RÉUSSIE ✅\nGains: +{self.bet_result['winnings']} crédits"
+            # Créditer l'or (double du montant misé)
+            self.gold += self.bet_result['winnings']
         elif self.bet_type == "failure" and not mission_success:
             # Pari gagné sur l'échec de la MISSION DE BATAILLE
             self.bet_result['won'] = True
             self.bet_result['winnings'] = self.bet_amount * 2
             self.bet_result['message'] = f"🎉 PARI GAGNÉ ! 🎉\nVous aviez parié sur l'ÉCHEC\nMission de bataille du héros: ÉCHOUÉE ❌\nGains: +{self.bet_result['winnings']} crédits"
+            # Créditer l'or (double du montant misé)
+            self.gold += self.bet_result['winnings']
         else:
             # Pari perdu
             self.bet_result['won'] = False
@@ -226,7 +261,9 @@ class MissionSystem:
             'mission_name': self.current_mission['name'] if self.current_mission else "Aucune",
             'mission_progress': self.hero.get_progress_percentage() if self.hero else 0,
             'hero_health': self.hero.get_health_percentage() if self.hero else 0,
-            'hero_stamina': self.hero.get_stamina_percentage() if self.hero else 0
+            'gold': self.gold,
+            'temp_bet_type': self.temp_bet_type,
+            'temp_bet_amount': self.temp_bet_amount
         }
     
     def is_mission_finished(self):

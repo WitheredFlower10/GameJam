@@ -1,5 +1,5 @@
 import arcade
-from utils.constants import SHIP_COLOR, SCREEN_WIDTH, SCREEN_HEIGHT, SHIP_SECTIONS
+from utils.constants import SHIP_COLOR, SCREEN_WIDTH, SCREEN_HEIGHT
 
 
 class Ship(arcade.SpriteList):
@@ -7,24 +7,12 @@ class Ship(arcade.SpriteList):
     def __init__(self):
         super().__init__()
         
-        self.sections = []
         self.interaction_points = []
         
-        self.create_ship_sections()
         self.create_interaction_points()
     
-    def create_ship_sections(self):
-        section_width = SCREEN_WIDTH // SHIP_SECTIONS
-        
-        for i in range(SHIP_SECTIONS):
-            section = arcade.SpriteSolidColor(section_width, SCREEN_HEIGHT, SHIP_COLOR)
-            section.center_x = i * section_width + section_width // 2
-            section.center_y = SCREEN_HEIGHT // 2
-            self.sections.append(section)
-            self.append(section)
-    
     def create_interaction_points(self):
-        # Section Avant - Bureau des missions
+        # Bureau des missions
         self.interaction_points.append({
             'x': SCREEN_WIDTH // 6,
             'y': 150,
@@ -33,7 +21,7 @@ class Ship(arcade.SpriteList):
             'description': 'Distribuer des missions aux héros'
         })
         
-        # Section Centre - Station de surveillance
+        # Station de surveillance
         self.interaction_points.append({
             'x': SCREEN_WIDTH // 2,
             'y': 200,
@@ -42,7 +30,7 @@ class Ship(arcade.SpriteList):
             'description': 'Améliorer la qualité de surveillance'
         })
         
-        # Section Arrière - Station de paris
+        # Station de paris
         self.interaction_points.append({
             'x': 5 * SCREEN_WIDTH // 6,
             'y': 180,
@@ -51,7 +39,7 @@ class Ship(arcade.SpriteList):
             'description': 'Parier sur la réussite du héros'
         })
         
-        # Section Arrière - Analyse de données
+        # Analyse de données
         self.interaction_points.append({
             'x': 5 * SCREEN_WIDTH // 6,
             'y': 120,

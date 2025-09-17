@@ -44,8 +44,17 @@ AGENT_STATE_MOVING = "moving"
 AGENT_STATE_INTERACTING = "interacting"
 
 # États du héros
-HERO_STATE_TRAVELING = "traveling"
+HERO_STATE_WAITING_FOR_MISSION = "waiting_for_mission"
 HERO_STATE_FIGHTING = "fighting"
-HERO_STATE_RESTING = "resting"
 HERO_STATE_COMPLETED = "completed"
 HERO_STATE_FAILED = "failed"
+
+# --- Constantes de Bataille Galactique ---
+PLAYER_SCALING = 0.5
+ENEMY_SCALING = 0.5
+BULLET_SCALING = 0.3
+EXPLOSION_SCALING = 0.6
+ENEMY_SPEED = 2
+BULLET_SPEED = 5
+SPAWN_INTERVAL = 0.8  # secondes entre spawn d'ennemis
+GAME_DURATION = 20     # durée minimale en secondes

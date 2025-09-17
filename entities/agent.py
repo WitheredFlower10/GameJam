@@ -82,18 +82,18 @@ class Agent(arcade.Sprite):
             self.interact_pressed = False
     
     def on_key_press(self, key, modifiers):
-        if key == arcade.key.LEFT:
+        if key == arcade.key.LEFT or key == arcade.key.Q:
             self.left_pressed = True
-        elif key == arcade.key.RIGHT:
+        elif key == arcade.key.RIGHT or key == arcade.key.D:
             self.right_pressed = True
-        elif key == arcade.key.SPACE:
+        elif key == arcade.key.SPACE or key == arcade.key.F:
             self.interact_pressed = True
     
     def on_key_release(self, key, modifiers):
-        if key == arcade.key.LEFT:
+        if key == arcade.key.LEFT or key == arcade.key.Q:
             self.left_pressed = False
-        elif key == arcade.key.RIGHT:
+        elif key == arcade.key.RIGHT or key == arcade.key.D:
             self.right_pressed = False
-        elif key == arcade.key.SPACE:
+        elif key == arcade.key.SPACE or key == arcade.key.F:
             self.interact_pressed = False
     

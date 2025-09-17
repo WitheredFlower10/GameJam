@@ -76,9 +76,11 @@ class SurveillanceScreen:
             SCREEN_COLOR
         )
         
-        # Dessiner la mission de bataille si active
+        # Dessiner la mission active (bataille ou exploration)
         if self.hero and self.hero.battle_mission:
             self.hero.battle_mission.draw()
+        elif self.hero and getattr(self.hero, 'explore_mission', None):
+            self.hero.explore_mission.draw()
         else:
             # Dessiner les éléments d'arrière-plan normaux
             for sprite in self.background_sprites:
@@ -125,16 +127,11 @@ class SurveillanceScreen:
             info_x - 20, info_x + 80, info_y - 10, info_y, arcade.color.WHITE
         )
         
-        # Barre d'endurance
-        arcade.draw_text("Endurance:", info_x, info_y - 25, arcade.color.WHITE, 12)
-        stamina_width = (self.hero.get_stamina_percentage() / 100) * 100
-        arcade.draw_lrbt_rectangle_filled(
-            info_x + 10, info_x + 10 + stamina_width, info_y - 35, info_y - 25, arcade.color.BLUE
-        )
-        arcade.draw_lrbt_rectangle_outline(
-            info_x + 10, info_x + 110, info_y - 35, info_y - 25, arcade.color.WHITE
-        )
-        
         # État du héros
         state_text = f"État: {self.hero.state}"
-        arcade.draw_text(state_text, info_x, info_y - 50, arcade.color.WHITE, 12)
+        arcade.draw_text(state_text, info_x, info_y - 25, arcade.color.WHITE, 12)
+        
+        # Compteur d'ennemis tués (si mission de bataille active)
+        if self.hero.battle_mission and self.hero.battle_mission.is_active:
+            kill_text = f"Ennemis: {self.hero.battle_mission.enemies_destroyed}/{self.hero.battle_mission.enemies_to_kill}"
+            arcade.draw_text(kill_text, info_x, info_y - 45, arcade.color.YELLOW, 12)

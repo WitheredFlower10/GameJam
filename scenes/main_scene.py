@@ -29,7 +29,7 @@ class MainScene(arcade.View):
         
         # État du jeu
         self.game_state = GAME_STATE_PLAYING
-        self.current_ship_section = 1  # 0=Avant, 1=Centre, 2=Arrière
+        self.current_ship_section = 1
         self.surveillance_was_displayed = False
         
         self.setup()
@@ -91,7 +91,10 @@ class MainScene(arcade.View):
                 if (self.mission_system.bet_placed and not self.mission_system.bet_result):
                     self.mission_system.calculate_bet_result()
                     print("Résultat du pari calculé - Écran de surveillance fermé !")
-        
+        if getattr(self, '_floating_message', None):
+            msg = self._floating_message
+            arcade.draw_text(msg['text'], SCREEN_WIDTH//2, msg['y'], msg['color'], 20, anchor_x="center", anchor_y="center")
+
         # Interface utilisateur
         self.gui_camera.use()
         self.draw_ui()
@@ -101,10 +104,10 @@ class MainScene(arcade.View):
         arcade.draw_text("Agent de Missions", 10, SCREEN_HEIGHT - 30, 
                         arcade.color.WHITE, 24, bold=True)
         
-        # Informations sur la section du vaisseau
-        section_names = ["Avant", "Centre", "Arrière"]
-        arcade.draw_text(f"Section: {section_names[self.current_ship_section]}", 
-                        10, SCREEN_HEIGHT - 60, arcade.color.WHITE, 16)
+        # Or en haut à droite
+        gold_text = f"Or: {self.mission_system.gold}"
+        arcade.draw_text(gold_text, SCREEN_WIDTH - 10, SCREEN_HEIGHT - 30,
+                         arcade.color.GOLD, 18, anchor_x="right", bold=True)
         
         # État de la mission
         if self.mission_system.current_mission:
@@ -155,63 +158,101 @@ class MainScene(arcade.View):
             (0, 0, 0, 150)
         )
         
+        # Panneau central
+        panel_left = SCREEN_WIDTH // 2 - 320
+        panel_right = SCREEN_WIDTH // 2 + 320
+        panel_bottom = SCREEN_HEIGHT // 2 - 220
+        panel_top = SCREEN_HEIGHT // 2 + 220
+        arcade.draw_lrbt_rectangle_filled(panel_left, panel_right, panel_bottom, panel_top, (20, 20, 30, 230))
+        arcade.draw_lrbt_rectangle_outline(panel_left, panel_right, panel_bottom, panel_top, arcade.color.GOLD, 3)
+        
         # Titre
         arcade.draw_text(
             "STATION DE PARIS",
-            SCREEN_WIDTH // 2, SCREEN_HEIGHT - 100,
+            SCREEN_WIDTH // 2, panel_top - 40,
             arcade.color.GOLD, 32, anchor_x="center", bold=True
         )
         
         # Informations de la mission
         arcade.draw_text(
             f"Mission: {betting_info['mission_name']}",
-            SCREEN_WIDTH // 2, SCREEN_HEIGHT - 150,
+            SCREEN_WIDTH // 2, panel_top - 90,
             arcade.color.WHITE, 20, anchor_x="center"
         )
         
         # Statistiques du héros
         arcade.draw_text(
             f"Progression: {betting_info['mission_progress']:.1f}%",
-            SCREEN_WIDTH // 2, SCREEN_HEIGHT - 180,
+            SCREEN_WIDTH // 2, panel_top - 120,
             arcade.color.LIGHT_BLUE, 16, anchor_x="center"
         )
         
         arcade.draw_text(
             f"Vie: {betting_info['hero_health']:.1f}%",
-            SCREEN_WIDTH // 2, SCREEN_HEIGHT - 200,
+            SCREEN_WIDTH // 2, panel_top - 140,
             arcade.color.GREEN, 16, anchor_x="center"
-        )
-        
-        arcade.draw_text(
-            f"Endurance: {betting_info['hero_stamina']:.1f}%",
-            SCREEN_WIDTH // 2, SCREEN_HEIGHT - 220,
-            arcade.color.BLUE, 16, anchor_x="center"
         )
         
         # Options de pari
         arcade.draw_text(
             "Sur quoi voulez-vous parier ?",
-            SCREEN_WIDTH // 2, SCREEN_HEIGHT - 280,
+            SCREEN_WIDTH // 2, panel_top - 200,
             arcade.color.WHITE, 18, anchor_x="center"
         )
         
         # Boutons de pari
         arcade.draw_text(
-            "1 - RÉUSSITE de la mission (x2 gains)",
-            SCREEN_WIDTH // 2, SCREEN_HEIGHT - 320,
+            "1 - RÉUSSITE de la mission (x2)",
+            SCREEN_WIDTH // 2, panel_top - 240,
             arcade.color.GREEN, 16, anchor_x="center"
         )
         
         arcade.draw_text(
-            "2 - ÉCHEC de la mission (x2 gains)",
-            SCREEN_WIDTH // 2, SCREEN_HEIGHT - 350,
+            "2 - ÉCHEC de la mission (x2)",
+            SCREEN_WIDTH // 2, panel_top - 270,
             arcade.color.RED, 16, anchor_x="center"
         )
         
         arcade.draw_text(
             "3 - Annuler",
-            SCREEN_WIDTH // 2, SCREEN_HEIGHT - 380,
+            SCREEN_WIDTH // 2, panel_top - 300,
             arcade.color.GRAY, 16, anchor_x="center"
+        )
+        
+        # Sélection courante
+        sel = betting_info['temp_bet_type'] or "—"
+        arcade.draw_text(
+            f"Sélection: {sel}",
+            SCREEN_WIDTH // 2, panel_bottom + 120,
+            arcade.color.WHITE, 18, anchor_x="center"
+        )
+        
+        # Montant à parier + contrôles
+        arcade.draw_text(
+            f"Montant: {betting_info['temp_bet_amount']} (←/→ pour ajuster)",
+            SCREEN_WIDTH // 2, panel_bottom + 90,
+            arcade.color.GOLD, 18, anchor_x="center"
+        )
+        
+        # Solde
+        arcade.draw_text(
+            f"Solde: {betting_info['gold']}",
+            SCREEN_WIDTH // 2, panel_bottom + 60,
+            arcade.color.LIGHT_GRAY, 16, anchor_x="center"
+        )
+        
+        # Validation
+        arcade.draw_text(
+            "ENTRÉE - Valider le pari",
+            SCREEN_WIDTH // 2, panel_bottom + 30,
+            arcade.color.LIGHT_GREEN, 16, anchor_x="center"
+        )
+        
+        # Aide
+        arcade.draw_text(
+            "1=Succès  2=Échec  3=Annuler  ←/→=Montant  Entrée=OK",
+            SCREEN_WIDTH // 2, panel_bottom + 10,
+            arcade.color.LIGHT_GRAY, 12, anchor_x="center"
         )
         
         # Instructions
@@ -285,13 +326,24 @@ class MainScene(arcade.View):
     
     def handle_betting_input(self, key):
         # Gérer les entrées pour l'interface de paris
+        info = self.mission_system.get_betting_info()
+        if not info:
+            return
+        
         if key == arcade.key.KEY_1:
-            # Parier sur la réussite
-            result = self.mission_system.place_bet("success", 100)  # 100 crédits par défaut
-            print(result)
+            self.mission_system.temp_bet_type = "success"
         elif key == arcade.key.KEY_2:
-            # Parier sur l'échec
-            result = self.mission_system.place_bet("failure", 100)  # 100 crédits par défaut
+            self.mission_system.temp_bet_type = "failure"
+        elif key == arcade.key.LEFT:
+            self.mission_system.temp_bet_amount = max(0, self.mission_system.temp_bet_amount - 10)
+        elif key == arcade.key.RIGHT:
+            self.mission_system.temp_bet_amount = min(self.mission_system.gold, self.mission_system.temp_bet_amount + 10)
+        elif key == arcade.key.ENTER or key == arcade.key.RETURN:
+            if not self.mission_system.temp_bet_type:
+                print("Choisissez d'abord Succès (1) ou Échec (2)")
+                return
+            amount = self.mission_system.temp_bet_amount
+            result = self.mission_system.place_bet(self.mission_system.temp_bet_type, amount)
             print(result)
         elif key == arcade.key.KEY_3:
             # Annuler
@@ -350,6 +402,13 @@ class MainScene(arcade.View):
                 # L'écran de surveillance s'est fermé - la mission est terminée
                 self.mission_system.calculate_bet_result()
                 print("Résultat du pari calculé - Écran de surveillance fermé (détection update) !")
+
+            if getattr(self, '_floating_message', None):
+              msg = self._floating_message
+              msg['y'] += 1  # bouge vers le haut
+              msg['frames'] += 1
+              if msg['frames'] > 120: # dure 2 seconde 
+                  self._floating_message = None
     
     def update_ship_section(self):
         # Déterminer la section du vaisseau selon la position de l'agent
@@ -382,3 +441,26 @@ class MainScene(arcade.View):
         if self.game_state == GAME_STATE_PLAYING:
             # Transmettre les contrôles à l'agent seulement
             self.agent.on_key_release(key, modifiers)
+
+def trigger_repair_screen(self):
+        def on_finish(success):
+            self.window.show_view(self)
+            if success:
+                self.show_floating_message("Écran connecté avec succès !", arcade.color.GREEN)
+            else:
+                self.show_floating_message("Connexion échouée !", arcade.color.RED)
+        self._floating_message = None
+        self.window.show_view(RepairScreenGame(on_finish_callback=on_finish))
+
+def show_floating_message(self, text, color):
+        self._floating_message = {
+            'text': text,
+            'color': color,
+            'y': 100,
+            'frames': 0
+        }
+
+#dans on_draw() methode, pour afficher le floating message
+    
+#dans on_update() methode, pour mettre a jour le floating message
+ 

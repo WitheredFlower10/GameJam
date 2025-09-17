@@ -47,7 +47,7 @@ class MenuScene(arcade.View):
         self.draw_controls()
         
         # Version
-        arcade.draw_text("Version 1.0 - Game Jam 2024", 
+        arcade.draw_text("Version 1.0 - Game Jam 2025", 
                         10, 10, arcade.color.GRAY, 12)
     
     def draw_starfield(self):
@@ -81,27 +81,11 @@ class MenuScene(arcade.View):
         
         # Titre principal
         arcade.draw_text(
-            "AGENT DE MISSIONS",
+            "THE OBSERVER PROTOCOL",
             title_x, title_y,
             self.title_color, 48,
             anchor_x="center",
             bold=True
-        )
-        
-        # Sous-titre
-        arcade.draw_text(
-            "Mission Control Center",
-            title_x, title_y - 50,
-            self.subtitle_color, 20,
-            anchor_x="center"
-        )
-        
-        # Description
-        arcade.draw_text(
-            "Distribuez des missions aux héros galactiques",
-            title_x, title_y - 80,
-            arcade.color.LIGHT_GRAY, 16,
-            anchor_x="center"
         )
     
     def draw_menu_options(self):
