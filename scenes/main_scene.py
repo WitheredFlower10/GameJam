@@ -53,9 +53,6 @@ class MainScene(arcade.View):
         
         # Initialiser les entités
         self.agent = Agent()
-        # Démarrer au centre du monde (x=0)
-        self.agent.center_x = 0
-        self.agent.center_y = 80  # au bas de l'écran
         self.agent_list.append(self.agent)
         
         self.hero = Hero()
@@ -71,7 +68,12 @@ class MainScene(arcade.View):
         
         # Déterminer la taille du monde (selon le vaisseau ou une texture de fond)
         self.determine_world_size()
-        # Propager les bornes monde centrées (ex: -2000 .. 2000)
+        
+        # Positionner l'agent au début du monde (avec les nouvelles coordonnées)
+        self.agent.center_x = 2000  # Au milieu
+        self.agent.center_y = 200  # Sur le sol du background
+        
+        # Propager les bornes du monde à l'agent
         self.agent.world_left = self.world_left
         self.agent.world_right = self.world_right
 
@@ -118,29 +120,34 @@ class MainScene(arcade.View):
                 path = getattr(self.ship, attr_name)
                 if isinstance(path, str):
                     candidate_paths.append(path)
-        # Valeurs par défaut
-        candidate_paths.extend(['background.png', 'assets/background.png'])
+        # Valeurs par défaut - priorité à notre background 4000px
+        candidate_paths.extend(['assets/background.png', 'background.png'])
         
         for path in candidate_paths:
             try:
                 tex = arcade.load_texture(path)
                 if tex and tex.width > 0 and tex.height > 0:
                     self.background_texture = tex
-                    # Si aucune taille monde fiable fournie par le vaisseau, utiliser celle de la texture
+                    print(f"Background chargé: {path} ({tex.width}x{tex.height})")
+                    
+                     # Si aucune taille monde fiable fournie par le vaisseau, utiliser celle de la texture
                     if not has_ship_world:
-                        self.world_width = tex.width
-                        self.world_height = tex.height
-                        self.world_left = -tex.width // 2
-                        self.world_right = tex.width // 2
+                         self.world_width = tex.width  # Largeur exacte du background
+                         self.world_height = tex.height  # Hauteur exacte du background
+                         # Le monde fait exactement la taille du background
+                         self.world_left = 0
+                         self.world_right = tex.width  # Limite exacte du background
                     return
-            except Exception:
+            except Exception as e:
+                print(f"Impossible de charger {path}: {e}")
                 continue
-        # Si rien trouvé, on conserve la taille d'écran par défaut
-        # Forcer une carte large minimale si désiré (ex: 4000px)
-        if self.world_width < 4000:
-            self.world_width = 4000
-            self.world_left = -2000
-            self.world_right = 2000
+                
+        # Si rien trouvé, créer un monde de 4000px par défaut
+        print("Aucun background trouvé, utilisation d'un monde 4000px")
+        self.world_width = 4000
+        self.world_height = 1024  # Hauteur par défaut adaptée au background
+        self.world_left = 0
+        self.world_right = 4000  # Limite exacte du monde
 
     def on_draw(self):
         self.clear()
@@ -177,11 +184,6 @@ class MainScene(arcade.View):
         # Titre
         arcade.draw_text("Agent de Missions", 10, SCREEN_HEIGHT - 30, 
                         arcade.color.WHITE, 24, bold=True)
-        
-        # Informations sur la section du vaisseau
-        section_names = ["Avant", "Centre", "Arrière"]
-        arcade.draw_text(f"Section: {section_names[self.current_ship_section]}", 
-                        10, SCREEN_HEIGHT - 60, arcade.color.WHITE, 16)
         
         # État de la mission
         if self.mission_system.current_mission:
@@ -236,50 +238,58 @@ class MainScene(arcade.View):
         )
 
     def draw_background(self):
-        if not hasattr(self, "_bg_ready") or not self._bg_ready:
+        """Dessine le background du monde - méthode forcée pour position absolue"""
+        if self.background_texture:
+            # Utiliser la méthode la plus directe possible
             try:
-                # Si ton Ship expose déjà une texture, récupère-la :
-                if hasattr(self.ship, "background_texture"):
-                    self._bg_tex = self.ship.background_texture
-                elif hasattr(self.ship, "get_background_texture"):
-                    self._bg_tex = self.ship.get_background_texture()
+                # Essayer draw_scaled_texture_rectangle si disponible
+                if hasattr(arcade, "draw_scaled_texture_rectangle"):
+                    arcade.draw_scaled_texture_rectangle(
+                        self.background_texture.width // 2,  # center_x
+                        self.background_texture.height // 2,  # center_y
+                        self.background_texture,
+                        1.0,  # scale
+                        0     # angle
+                    )
+                # Sinon draw_texture_rectangle classique
+                elif hasattr(arcade, "draw_texture_rectangle"):
+                    arcade.draw_texture_rectangle(
+                        self.background_texture.width // 2,  # center_x
+                        self.background_texture.height // 2,  # center_y
+                        self.background_texture.width,  # width
+                        self.background_texture.height,  # height
+                        self.background_texture
+                    )
+                # Méthode lrwh si disponible
+                elif hasattr(arcade, "draw_lrwh_rectangle_textured"):
+                    arcade.draw_lrwh_rectangle_textured(
+                        0, self.background_texture.width,  # left, right
+                        0, self.background_texture.height,  # bottom, top
+                        self.background_texture
+                    )
                 else:
-                    self._bg_tex = arcade.load_texture("background.png")
-            except Exception:
-                self._bg_tex = None
-
-            # Déduis les bornes du monde
-            if self._bg_tex is not None:
-                self.world_width = getattr(self, "world_width", self._bg_tex.width)
-                self.world_height = getattr(self, "world_height", self._bg_tex.height)
-
-            # Prépare un sprite de secours (marche partout)
-            if self._bg_tex is not None:
-                self._bg_sprite = arcade.Sprite()
-                self._bg_sprite.texture = self._bg_tex
-                self._bg_sprite.left = 0
-                self._bg_sprite.bottom = 0
-            else:
-                self._bg_sprite = None
-
-            self._bg_ready = True
-
-        # Rien à dessiner ?
-        if self._bg_tex is None:
-            return
-
-        w, h = self._bg_tex.width, self._bg_tex.height
-
-        # 1) Arcade 2.x : draw_lrwh_rectangle_textured existe
-        if hasattr(arcade, "draw_lrwh_rectangle_textured"):
-            arcade.draw_lrwh_rectangle_textured(self.world_left, self.world_right, 0, h, self._bg_tex)
-            return
-
-        # 2) Arcade 3.x : dessiner le Sprite
-        if self._bg_sprite is not None:
-            self._bg_sprite.left = self.world_left
-            self._bg_sprite.bottom = 0
-            self._bg_sprite.draw()
+                    # Fallback Sprite avec reset forcé
+                    self._bg_sprite_list = arcade.SpriteList()  # Reset à chaque frame
+                    bg_sprite = arcade.Sprite()
+                    bg_sprite.texture = self.background_texture
+                    bg_sprite.left = 0
+                    bg_sprite.bottom = 0
+                    self._bg_sprite_list.append(bg_sprite)
+                    self._bg_sprite_list.draw()
+                    
+            except Exception as e:
+                print(f"Erreur dessin background: {e}")
+                # Fallback: fond coloré simple
+                arcade.draw_lrbt_rectangle_filled(
+                    0, self.world_width, 0, self.world_height,
+                    arcade.color.DARK_BLUE_GRAY
+                )
+        else:
+            # Pas de texture : fond simple
+            arcade.draw_lrbt_rectangle_filled(
+                0, self.world_width, 0, self.world_height,
+                arcade.color.BLACK
+            )
 
 
     def draw_betting_interface(self):
@@ -512,12 +522,17 @@ class MainScene(arcade.View):
     
     def update_camera(self):
         # Suivi fluide: Camera2D.position représente le CENTRE de la caméra
-        half_w = SCREEN_WIDTH / 2
-        half_h = SCREEN_HEIGHT / 2
+        # En fullscreen, on utilise la taille réelle de l'écran
+        screen_w = self.window.width
+        screen_h = self.window.height
+        half_w = screen_w / 2
+        half_h = screen_h / 2
 
         # Cibler le centre sur l'agent en X
         target_center_x = max(self.world_left + half_w, min(self.world_right - half_w, self.agent.center_x))
-        # Verrou vertical: garder le bas du monde (ou sol) aligné avec le bas de l'écran
+        
+        # Pour que le background touche le bas : le centre Y de la caméra doit être à half_h
+        # Cela met y=0 du monde au bas de l'écran
         target_center_y = half_h
 
         # Easing vers la cible

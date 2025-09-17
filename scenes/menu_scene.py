@@ -18,6 +18,8 @@ class MenuScene(arcade.View):
         #Son
         self.sound_back = arcade.load_sound("assets/sounds/menu_back.wav")
         self.sound_enabled = True
+        self.background_music_player = None
+        self.music_should_loop = True  # Flag pour contrôler la boucle
 
         
         # État du menu
@@ -31,6 +33,102 @@ class MenuScene(arcade.View):
         # Animation
         self.animation_timer = 0
         self.fade_alpha = 255  # Fondu au démarrage
+        
+        # Créer les objets Text pour de meilleures performances
+        self.create_text_objects()
+        
+        # Démarrer la musique de fond
+        self.start_background_music()
+    
+    def create_text_objects(self):
+        """Crée les objets Text pour de meilleures performances - adapté au fullscreen"""
+        # Obtenir la taille réelle de l'écran
+        screen_w = self.window.width
+        screen_h = self.window.height
+        
+        # Titre principal (fixe, sans zoom) - adapté à la taille d'écran
+        title_size = max(54, int(screen_h * 0.08))  # Taille proportionnelle
+        self.title_text = arcade.Text(
+            "The Observer Protocol",
+            screen_w // 2, screen_h - int(screen_h * 0.15),
+            (0, 0, 255), title_size,
+            anchor_x="center", bold=True
+        )
+        
+        # Sous-titre
+        subtitle_size = max(20, int(screen_h * 0.03))
+        self.subtitle_text = arcade.Text(
+            "Centre de Commande Intergalactique",
+            screen_w // 2, screen_h - int(screen_h * 0.25),
+            self.subtitle_color, subtitle_size,
+            anchor_x="center"
+        )
+        
+        # Contrôles
+        controls_size = max(16, int(screen_h * 0.025))
+        self.controls_text = arcade.Text(
+            "Naviguez avec ↑↓  |  Validez avec ENTRÉE",
+            screen_w // 2, int(screen_h * 0.15),
+            (180, 180, 180), controls_size,
+            anchor_x="center"
+        )
+        
+        # Version du jeu
+        version_size = max(12, int(screen_h * 0.02))
+        self.version_text = arcade.Text(
+            "Version 1.0 - Game Jam 2025",
+            10, 10,
+            (150, 150, 150), version_size
+        )
+        
+        # Options du menu (créées dynamiquement)
+        self.menu_text_objects = []
+        self.update_menu_text_objects()
+    
+    def update_menu_text_objects(self):
+        """Crée les objets Text du menu (valeurs initiales) - adaptatif"""
+        self.menu_text_objects.clear()
+        
+        screen_h = self.window.height
+        menu_font_size = max(26, int(screen_h * 0.035))  # Taille adaptative
+        
+        for i, option in enumerate(self.menu_options):
+            text_obj = arcade.Text(
+                option,
+                self.window.width // 2, 0,  # Position sera mise à jour dans draw_menu_options
+                self.option_color, menu_font_size,
+                anchor_x="center",
+                bold=False
+            )
+            self.menu_text_objects.append(text_obj)
+    
+    def start_background_music(self):
+        """Démarre la musique de fond en boucle"""
+        if self.sound_enabled and self.sound_back:
+            try:
+                # Jouer avec un volume réduit (sans looping pour compatibilité)
+                self.background_music_player = arcade.play_sound(
+                    self.sound_back, volume=0.3
+                )
+                print("Musique de fond démarrée")
+            except Exception as e:
+                print(f"Erreur lors du démarrage de la musique: {e}")
+                self.sound_enabled = False
+    
+    def stop_background_music(self):
+        """Arrête la musique de fond"""
+        # Désactiver la boucle automatique
+        self.music_should_loop = False
+        
+        if self.background_music_player:
+            try:
+                self.background_music_player.delete() 
+                self.background_music_player = None
+                print("Musique de fond arrêtée")
+            except Exception as e:
+                print(f"Erreur lors de l'arrêt de la musique: {e}")
+                # Forcer l'arrêt en supprimant la référence
+                self.background_music_player = None
     
     def on_draw(self):
         self.clear()
@@ -38,31 +136,32 @@ class MenuScene(arcade.View):
         # Fond spatial
         self.draw_space_background()
         
-        # Titre du jeu
-        self.draw_title()
+        # Dessiner tous les textes avec les objets Text (plus performant)
+        self.title_text.draw()
+        self.subtitle_text.draw()
+        self.controls_text.draw()
+        self.version_text.draw()
         
-        # Options du menu
+        # Dessiner les options du menu avec effets
         self.draw_menu_options()
         
-        # Instructions
-        self.draw_controls()
-        
-        # Version
-        arcade.draw_text("Version 1.0 - Game Jam 2025", 
-                        10, 10, (150, 150, 150), 12)
-        
-        # Effet fondu
+        # Effet fondu - adaptatif au fullscreen
         if self.fade_alpha > 0:
+            screen_w = self.window.width
+            screen_h = self.window.height
             arcade.draw_lrbt_rectangle_filled(
-                0, SCREEN_WIDTH, 0, SCREEN_HEIGHT,
+                0, screen_w, 0, screen_h,
                 (0, 0, 0, int(self.fade_alpha))
             )
     
     def draw_space_background(self):
-        """ Fond étoilé coloré avec effet galaxie """
+        """ Fond étoilé coloré avec effet galaxie - adapté au fullscreen """
+        screen_w = self.window.width
+        screen_h = self.window.height
+        
         for i in range(200):
-            x = (i * 37 + int(self.animation_timer * 1.5)) % SCREEN_WIDTH
-            y = (i * 73) % SCREEN_HEIGHT
+            x = (i * 37 + int(self.animation_timer * 1.5)) % screen_w
+            y = (i * 73) % screen_h
             size = 1 + (i % 3)
             # Couleurs variées pour un effet cosmique
             if i % 5 == 0:
@@ -74,90 +173,72 @@ class MenuScene(arcade.View):
                 color = (twinkle, twinkle, twinkle)
             arcade.draw_circle_filled(x, y, size, color)
         
-        # Effet "scanlines" rétro
-        for y in range(0, SCREEN_HEIGHT, 4):
-            arcade.draw_line(0, y, SCREEN_WIDTH, y, (0, 0, 0, 40), 1)
+        # Effet "scanlines" rétro adaptatif
+        for y in range(0, screen_h, 4):
+            arcade.draw_line(0, y, screen_w, y, (0, 0, 0, 40), 1)
     
-    def draw_title(self):
-        title_x = SCREEN_WIDTH // 2
-        title_y = SCREEN_HEIGHT - 120
-        
-        # Zoom + oscillation
-        scale = 1.0 + 0.08 * math.sin(self.animation_timer * 0.05)
-        glow = 0
-        
-        # Titre principal avec halo
-        arcade.draw_text(
-            "The Observer Protocol",
-            title_x, title_y,
-            (0, glow, 255), int(54 * scale),
-            anchor_x="center",
-            bold=True
-        )
-        
-        # Sous-titre
-        arcade.draw_text(
-            "Centre de Commande Intergalactique",
-            title_x, title_y - 60,
-            self.subtitle_color, 20,
-            anchor_x="center"
-        )
+    
     
     def draw_menu_options(self):
-        start_y = SCREEN_HEIGHT // 2 + 50
-        option_height = 70
+        screen_w = self.window.width
+        screen_h = self.window.height
+        start_y = screen_h // 2 + int(screen_h * 0.07)
+        option_height = int(screen_h * 0.09)
         
         for i, option in enumerate(self.menu_options):
             y_pos = start_y - (i * option_height)
             
             if i == self.selected_option:
-                # Pulsation néon
+                # Pulsation néon pour le fond - adaptatif
                 pulse = 150 + 100 * math.sin(self.animation_timer * 0.1)
                 color = self.option_hover_color
                 glow_color = (color[0], color[1], color[2], int(pulse))
+                glow_width = int(screen_w * 0.4)
+                glow_height = int(screen_h * 0.04)
                 arcade.draw_lrbt_rectangle_filled(
-                    SCREEN_WIDTH // 2 - 220, SCREEN_WIDTH // 2 + 220,
-                    y_pos - 30, y_pos + 30,
+                    screen_w // 2 - glow_width, screen_w // 2 + glow_width,
+                    y_pos - glow_height, y_pos + glow_height,
                     glow_color
                 )
             else:
                 color = self.option_color
             
-            arcade.draw_text(
-                option,
-                SCREEN_WIDTH // 2, y_pos,
-                color, 26,
-                anchor_x="center",
-                bold=(i == self.selected_option)
-            )
+            # Utiliser l'objet Text avec les animations - adaptatif
+            text_obj = self.menu_text_objects[i]
+            text_obj.x = screen_w // 2
+            text_obj.y = y_pos
+            text_obj.color = color
+            text_obj.bold = (i == self.selected_option)
+            text_obj.draw()
     
-    def draw_controls(self):
-        controls_y = 120
-        arcade.draw_text(
-            "Naviguez avec ↑↓  |  Validez avec ENTRÉE",
-            SCREEN_WIDTH // 2, controls_y,
-            (180, 180, 180), 16,
-            anchor_x="center"
-        )
     
     def on_key_press(self, key, modifiers):
-        if key == arcade.key.UP:
+        if key == arcade.key.UP or key == arcade.key.Z:
             self.selected_option = (self.selected_option - 1) % len(self.menu_options)
-        elif key == arcade.key.DOWN:
+        elif key == arcade.key.DOWN or key == arcade.key.S:
             self.selected_option = (self.selected_option + 1) % len(self.menu_options)
-        elif key == arcade.key.ENTER or key == arcade.key.SPACE:
+        elif key == arcade.key.ENTER or key == arcade.key.SPACE or key == arcade.key.F:
             self.select_option()
         elif key == arcade.key.ESCAPE:
             arcade.exit()
     
     def select_option(self):
-        if self.selected_option == 0:  # Démarrer
+        """Gère la sélection d'une option du menu"""
+        if self.selected_option == 0:  # Démarrer l'Opération
+            # Arrêter la musique de fond
+            self.stop_background_music()
+            
+            # Lancer le jeu principal
             from scenes.main_scene import MainScene
-            game_scene = MainScene()
-            self.window.show_view(game_scene)
-        elif self.selected_option == 1:  # Manuel
-            self.show_instructions()
-        elif self.selected_option == 2:  # Quitter
+            main_scene = MainScene()
+            self.window.show_view(main_scene)
+            
+        elif self.selected_option == 1:  # Manuel Galactique
+            # Garder la musique pour les instructions
+            instructions = InstructionsView()
+            self.window.show_view(instructions)
+            
+        elif self.selected_option == 2:  # Éjecter du Système
             arcade.exit()
     
     def show_instructions(self):
@@ -168,6 +249,20 @@ class MenuScene(arcade.View):
         self.animation_timer += delta_time * 60
         if self.fade_alpha > 0:
             self.fade_alpha -= delta_time * 200
+        
+        # Gérer la boucle de musique manuellement (seulement si autorisée)
+        if (self.music_should_loop and self.sound_enabled and self.sound_back and 
+            self.background_music_player and 
+            not self.background_music_player.playing):
+            # Redémarrer la musique quand elle se termine
+            try:
+                self.background_music_player = arcade.play_sound(
+                    self.sound_back, volume=0.3
+                )
+                print("Musique de fond redémarrée")
+            except Exception as e:
+                print(f"Erreur lors du redémarrage de la musique: {e}")
+                self.sound_enabled = False
 
 
 class InstructionsView(arcade.View):
@@ -175,39 +270,49 @@ class InstructionsView(arcade.View):
     def __init__(self):
         super().__init__()
         self.background_color = arcade.color.BLACK
-    
-    def on_draw(self):
-        self.clear()
         
-        arcade.draw_text(
+        # Créer les objets Text pour de meilleures performances
+        self.create_instruction_texts()
+    
+    def create_instruction_texts(self):
+        """Crée tous les objets Text pour les instructions"""
+        # Titre
+        self.title_text = arcade.Text(
             "📜 MANUEL GALACTIQUE",
             SCREEN_WIDTH // 2, SCREEN_HEIGHT - 100,
             (0, 255, 220), 32,
-            anchor_x="center",
-            bold=True
+            anchor_x="center", bold=True
         )
         
+        # Instructions de retour
+        self.return_text = arcade.Text(
+            "⟵ ÉCHAP pour retourner au menu",
+            SCREEN_WIDTH // 2, 50,
+            (180, 180, 180), 16,
+            anchor_x="center"
+        )
+        
+        self.content_texts = []
         instructions = [
             "Bienvenue Agent ! Voici vos directives :",
             "",
             "🎯 Votre mission :",
-            "• Assigner des quêtes aux héros interstellaires",
+            "• Donner les quêtes aux héros interstellaires",
             "• Superviser leur progression depuis la base",
-            "• Maintenir l’ordre dans le vaisseau",
+            "• Faire la maintenance du vaisseau",
             "",
             "🎮 Contrôles :",
             "• FLÈCHES : Déplacer votre avatar",
             "• ESPACE : Interagir avec un terminal",
             "",
             "🛰️ Surveillance :",
-            "• L’écran central affiche la mission en cours",
-            "• Les héros agissent seuls, mais vous pouvez",
-            "  influencer leur réussite par vos choix",
+            "• L'écran central affiche la mission en cours",
+            "• Les héros agissent seuls, mais vous pouvez parier sur leur réussite",
             "",
             "🏆 Objectif final :",
-            "• Accomplir vos tâches administratives",
-            "• Maximiser la réussite des missions",
-            "• Devenir l’agent de l’année galactique"
+            "• Accomplir vos tâches pour mieux voir le héros",
+            "• Maximiser la réussite de vos paris",
+            "• Gagner le plus d'argent possible"
         ]
         
         y_pos = SCREEN_HEIGHT - 160
@@ -225,18 +330,24 @@ class InstructionsView(arcade.View):
                 color = (255, 200, 0)
                 size = 18
             
-            arcade.draw_text(line, 60, y_pos, color, size)
+            text_obj = arcade.Text(line, 60, y_pos, color, size)
+            self.content_texts.append(text_obj)
             y_pos -= 25
+    
+    def on_draw(self):
+        self.clear()
         
-        arcade.draw_text(
-            "⟵ ÉCHAP pour retourner au menu",
-            SCREEN_WIDTH // 2, 50,
-            (180, 180, 180), 16,
-            anchor_x="center"
-        )
+        # Dessiner tous les textes avec les objets Text (plus performant)
+        self.title_text.draw()
+        
+        # Dessiner tout le contenu du manuel
+        for text_obj in self.content_texts:
+            text_obj.draw()
+        
+        # Instructions de retour
+        self.return_text.draw()
     
     def on_key_press(self, key, modifiers):
         if key == arcade.key.ESCAPE:
             menu_scene = MenuScene()
-            arcade.play_sound(menu_scene.sound_back)
             self.window.show_view(menu_scene)
