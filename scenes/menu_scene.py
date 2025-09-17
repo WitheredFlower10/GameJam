@@ -34,56 +34,72 @@ class MenuScene(arcade.View):
         self.animation_timer = 0
         self.fade_alpha = 255  # Fondu au démarrage
         
-        # Créer les objets Text pour de meilleures performances
-        self.create_text_objects()
+        # Marquer que les textes doivent être créés au premier draw
+        self.text_objects_created = False
+        self.use_fallback_text = False
         
         # Démarrer la musique de fond
         self.start_background_music()
     
     def create_text_objects(self):
         """Crée les objets Text pour de meilleures performances - adapté au fullscreen"""
-        # Obtenir la taille réelle de l'écran
-        screen_w = self.window.width
-        screen_h = self.window.height
+        try:
+            # Obtenir la taille réelle de l'écran
+            screen_w = self.window.width
+            screen_h = self.window.height
+            
+            # Titre principal (fixe, sans zoom) - adapté à la taille d'écran
+            title_size = max(54, int(screen_h * 0.08))  # Taille proportionnelle
+            self.title_text = arcade.Text(
+                "The Observer Protocol",
+                screen_w // 2, screen_h - int(screen_h * 0.15),
+                (0, 0, 255), title_size,
+                anchor_x="center", bold=True
+            )
         
-        # Titre principal (fixe, sans zoom) - adapté à la taille d'écran
-        title_size = max(54, int(screen_h * 0.08))  # Taille proportionnelle
-        self.title_text = arcade.Text(
-            "The Observer Protocol",
-            screen_w // 2, screen_h - int(screen_h * 0.15),
-            (0, 0, 255), title_size,
-            anchor_x="center", bold=True
-        )
-        
-        # Sous-titre
-        subtitle_size = max(20, int(screen_h * 0.03))
-        self.subtitle_text = arcade.Text(
-            "Centre de Commande Intergalactique",
-            screen_w // 2, screen_h - int(screen_h * 0.25),
-            self.subtitle_color, subtitle_size,
-            anchor_x="center"
-        )
-        
-        # Contrôles
-        controls_size = max(16, int(screen_h * 0.025))
-        self.controls_text = arcade.Text(
-            "Naviguez avec ↑↓  |  Validez avec ENTRÉE",
-            screen_w // 2, int(screen_h * 0.15),
-            (180, 180, 180), controls_size,
-            anchor_x="center"
-        )
-        
-        # Version du jeu
-        version_size = max(12, int(screen_h * 0.02))
-        self.version_text = arcade.Text(
-            "Version 1.0 - Game Jam 2025",
-            10, 10,
-            (150, 150, 150), version_size
-        )
-        
-        # Options du menu (créées dynamiquement)
-        self.menu_text_objects = []
-        self.update_menu_text_objects()
+            # Sous-titre
+            subtitle_size = max(20, int(screen_h * 0.03))
+            self.subtitle_text = arcade.Text(
+                "Centre de Commande Intergalactique",
+                screen_w // 2, screen_h - int(screen_h * 0.25),
+                self.subtitle_color, subtitle_size,
+                anchor_x="center"
+            )
+            
+            # Contrôles
+            controls_size = max(16, int(screen_h * 0.025))
+            
+            # Texte des contrôles adapté selon l'OS
+            import platform
+            if platform.system() == "Darwin":  # macOS
+                controls_text = "Naviguez avec ↑↓  |  Validez avec ENTRÉE  |  Cmd+F: Fullscreen (menu uniquement)"
+            else:
+                controls_text = "Naviguez avec ↑↓  |  Validez avec ENTRÉE  |  F11: Fullscreen (menu uniquement)"
+                
+            self.controls_text = arcade.Text(
+                controls_text,
+                screen_w // 2, int(screen_h * 0.15),
+                (180, 180, 180), controls_size,
+                anchor_x="center"
+            )
+            
+            # Version du jeu
+            version_size = max(12, int(screen_h * 0.02))
+            self.version_text = arcade.Text(
+                "Version 1.0 - Game Jam 2025",
+                10, 10,
+                (150, 150, 150), version_size
+            )
+            
+            # Options du menu (créées dynamiquement)
+            self.menu_text_objects = []
+            self.update_menu_text_objects()
+            
+        except Exception as e:
+            print(f"Erreur création objets Text: {e}")
+            # Fallback: utiliser draw_text classique
+            self.text_objects_created = False
+            self.use_fallback_text = True
     
     def update_menu_text_objects(self):
         """Crée les objets Text du menu (valeurs initiales) - adaptatif"""
@@ -101,6 +117,13 @@ class MenuScene(arcade.View):
                 bold=False
             )
             self.menu_text_objects.append(text_obj)
+    
+    def on_resize_event(self, width, height):
+        """Appelé quand la fenêtre change de taille (toggle fullscreen)"""
+        print(f"Redimensionnement détecté: {width}x{height}")
+        # Forcer la recréation des objets Text avec les nouvelles dimensions
+        self.text_objects_created = False
+        self.use_fallback_text = False
     
     def start_background_music(self):
         """Démarre la musique de fond en boucle"""
@@ -133,17 +156,30 @@ class MenuScene(arcade.View):
     def on_draw(self):
         self.clear()
         
+        # Créer les objets Text au premier draw (quand le canvas est attaché)
+        if not self.text_objects_created:
+            self.create_text_objects()
+            self.text_objects_created = True
+        
         # Fond spatial
         self.draw_space_background()
         
         # Dessiner tous les textes avec les objets Text (plus performant)
-        self.title_text.draw()
-        self.subtitle_text.draw()
-        self.controls_text.draw()
-        self.version_text.draw()
+        if not self.use_fallback_text:
+            try:
+                self.title_text.draw()
+                self.subtitle_text.draw()
+                self.controls_text.draw()
+                self.version_text.draw()
+                
+                # Dessiner les options du menu avec effets
+                self.draw_menu_options()
+            except Exception as e:
+                print(f"Erreur draw Text objects: {e}")
+                self.use_fallback_text = True
         
-        # Dessiner les options du menu avec effets
-        self.draw_menu_options()
+        if self.use_fallback_text:
+            self.draw_fallback_text()
         
         # Effet fondu - adaptatif au fullscreen
         if self.fade_alpha > 0:
@@ -177,6 +213,49 @@ class MenuScene(arcade.View):
         for y in range(0, screen_h, 4):
             arcade.draw_line(0, y, screen_w, y, (0, 0, 0, 40), 1)
     
+    def draw_fallback_text(self):
+        """Méthode fallback en cas de problème avec les objets Text"""
+        screen_w = self.window.width
+        screen_h = self.window.height
+        
+        # Titre avec draw_text classique
+        arcade.draw_text("The Observer Protocol", 
+                        screen_w // 2, screen_h - int(screen_h * 0.15),
+                        (0, 0, 255), max(54, int(screen_h * 0.08)),
+                        anchor_x="center")
+        
+        # Sous-titre
+        arcade.draw_text("Centre de Commande Intergalactique",
+                        screen_w // 2, screen_h - int(screen_h * 0.25),
+                        self.subtitle_color, max(20, int(screen_h * 0.03)),
+                        anchor_x="center")
+        
+        # Contrôles
+        import platform
+        if platform.system() == "Darwin":  # macOS
+            controls_text = "Naviguez avec ↑↓  |  Validez avec ENTRÉE  |  Cmd+F: Fullscreen (menu uniquement)"
+        else:
+            controls_text = "Naviguez avec ↑↓  |  Validez avec ENTRÉE  |  F11: Fullscreen (menu uniquement)"
+            
+        arcade.draw_text(controls_text,
+                        screen_w // 2, int(screen_h * 0.15),
+                        (180, 180, 180), max(16, int(screen_h * 0.025)),
+                        anchor_x="center")
+        
+        # Version
+        arcade.draw_text("Version 1.0 - Game Jam 2025",
+                        10, 10, (150, 150, 150), max(12, int(screen_h * 0.02)))
+        
+        # Options du menu
+        start_y = screen_h // 2 + int(screen_h * 0.07)
+        option_height = int(screen_h * 0.09)
+        
+        for i, option in enumerate(self.menu_options):
+            y_pos = start_y - (i * option_height)
+            color = self.option_hover_color if i == self.selected_option else self.option_color
+            
+            arcade.draw_text(option, screen_w // 2, y_pos, color,
+                           max(26, int(screen_h * 0.035)), anchor_x="center")
     
     
     def draw_menu_options(self):
@@ -227,6 +306,10 @@ class MenuScene(arcade.View):
         if self.selected_option == 0:  # Démarrer l'Opération
             # Arrêter la musique de fond
             self.stop_background_music()
+            
+            # Désactiver le toggle fullscreen
+            if hasattr(self.window, 'disable_fullscreen_toggle'):
+                self.window.disable_fullscreen_toggle()
             
             # Lancer le jeu principal
             from scenes.main_scene import MainScene

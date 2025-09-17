@@ -44,7 +44,40 @@ class MainScene(arcade.View):
         self.current_ship_section = 1  # 0=Avant, 1=Centre, 2=Arrière
         self.surveillance_was_displayed = False
         
+        # Dimensions UI adaptatives (initialisées aux valeurs par défaut)
+        self.ui_width = SCREEN_WIDTH
+        self.ui_height = SCREEN_HEIGHT
+        
         self.setup()
+    
+    def on_resize_event(self, width, height):
+        """Appelé quand la fenêtre change de taille (toggle fullscreen)"""
+        print(f"MainScene - Redimensionnement détecté: {width}x{height}")
+        
+        # Recalculer les éléments UI qui dépendent de la taille d'écran
+        # Redimensionner l'écran de surveillance
+        if self.surveillance_screen:
+            # Adapter la taille de l'écran de surveillance à la nouvelle résolution
+            screen_scale = min(width / 1024, height / 768)  # Échelle basée sur 1024x768
+            self.surveillance_screen.screen_width = int(400 * screen_scale)
+            self.surveillance_screen.screen_height = int(300 * screen_scale)
+            self.surveillance_screen.screen_x = int(50 * screen_scale)
+            self.surveillance_screen.screen_y = int(200 * screen_scale)
+            print(f"Écran de surveillance redimensionné: {self.surveillance_screen.screen_width}x{self.surveillance_screen.screen_height}")
+        
+        # Stocker les nouvelles dimensions pour les éléments UI
+        self.ui_width = width
+        self.ui_height = height
+        
+        # Recalculer les positions UI relatives
+        # Les éléments UI s'adaptent maintenant à la résolution
+        print(f"UI adaptée à la résolution: {self.ui_width}x{self.ui_height}")
+        
+        # Repositionner immédiatement la caméra avec les nouvelles dimensions
+        self.repositioner_camera()
+        
+        # Adapter d'autres éléments UI si nécessaire
+        # Le ship et l'agent s'adaptent automatiquement via la caméra
     
     def setup(self):
         # Initialiser les SpriteLists
@@ -182,21 +215,21 @@ class MainScene(arcade.View):
     
     def draw_ui(self):
         # Titre
-        arcade.draw_text("Agent de Missions", 10, SCREEN_HEIGHT - 30, 
+        arcade.draw_text("Agent de Missions", 10, self.ui_height - 30, 
                         arcade.color.WHITE, 24, bold=True)
         
         # État de la mission
         if self.mission_system.current_mission:
             mission = self.mission_system.current_mission
             arcade.draw_text(f"Mission: {mission['name']}", 
-                            10, SCREEN_HEIGHT - 90, arcade.color.WHITE, 16)
+                            10, self.ui_height - 90, arcade.color.WHITE, 16)
             arcade.draw_text(f"Progression: {mission.get('progress', 0):.1f}%", 
-                            10, SCREEN_HEIGHT - 110, arcade.color.WHITE, 16)
+                            10, self.ui_height - 110, arcade.color.WHITE, 16)
         else:
             arcade.draw_text("Aucune mission active", 
-                            10, SCREEN_HEIGHT - 90, arcade.color.GRAY, 16)
+                            10, self.ui_height - 90, arcade.color.GRAY, 16)
             arcade.draw_text("Allez au Bureau des Missions pour assigner une quête", 
-                            10, SCREEN_HEIGHT - 110, arcade.color.LIGHT_GRAY, 14)
+                            10, self.ui_height - 110, arcade.color.LIGHT_GRAY, 14)
         
         # Contrôles
         arcade.draw_text("FLÈCHES: Se déplacer | ESPACE: Interagir", 
@@ -215,12 +248,12 @@ class MainScene(arcade.View):
         # Résultat de pari
         if self.mission_system.bet_result:
             arcade.draw_text(self.mission_system.bet_result, 
-                            SCREEN_WIDTH // 2, 100, arcade.color.GOLD, 18,
+                            self.ui_width // 2, 100, arcade.color.GOLD, 18,
                             anchor_x="center")
         
         # Bouton retour au menu
         arcade.draw_text("ÉCHAP: Retour au menu", 
-                        SCREEN_WIDTH - 200, 30, arcade.color.LIGHT_GRAY, 12)
+                        self.ui_width - 200, 30, arcade.color.LIGHT_GRAY, 12)
     
     def draw_floating_message(self):
         # Dessiner un message flottant centré (en coordonnées écran/GUI)
@@ -229,7 +262,7 @@ class MainScene(arcade.View):
         msg = self.floating_message
         arcade.draw_text(
             msg['text'],
-            SCREEN_WIDTH // 2,
+            self.ui_width // 2,
             msg['y'],
             msg.get('color', arcade.color.WHITE),
             18,
@@ -300,14 +333,14 @@ class MainScene(arcade.View):
         
         # Fond semi-transparent
         arcade.draw_lrbt_rectangle_filled(
-            0, SCREEN_WIDTH, 0, SCREEN_HEIGHT,
+            0, self.ui_width, 0, self.ui_height,
             (0, 0, 0, 150)
         )
         
         # Titre
         arcade.draw_text(
             "STATION DE PARIS",
-            SCREEN_WIDTH // 2, SCREEN_HEIGHT - 100,
+            self.ui_width // 2, self.ui_height - 100,
             arcade.color.GOLD, 32, anchor_x="center", bold=True
         )
         
@@ -457,9 +490,6 @@ class MainScene(arcade.View):
             # Mettre à jour les SpriteLists
             self.agent_list.update()
             self.hero_list.update()
-            
-            # Mettre à jour la section du vaisseau selon la position de l'agent
-            self.update_ship_section()
 
             # Mettre à jour le message flottant (animation + durée ~2s)
             if self.floating_message:
@@ -511,15 +541,23 @@ class MainScene(arcade.View):
             # Mettre à jour la caméra APRÈS toutes les mises à jour
             self.update_camera()
     
-    def update_ship_section(self):
-        # Déterminer la section du vaisseau selon la position de l'agent
-        if self.agent.center_x < SCREEN_WIDTH // 3:
-            self.current_ship_section = 0  # Avant
-        elif self.agent.center_x < 2 * SCREEN_WIDTH // 3:
-            self.current_ship_section = 1  # Centre
-        else:
-            self.current_ship_section = 2  # Arrière
+
     
+    def repositioner_camera(self):
+        """Repositionne immédiatement la caméra après un redimensionnement"""
+        screen_w = self.window.width
+        screen_h = self.window.height
+        half_w = screen_w / 2
+        half_h = screen_h / 2
+
+        # Cibler le centre sur l'agent en X
+        target_center_x = max(self.world_left + half_w, min(self.world_right - half_w, self.agent.center_x))
+        target_center_y = half_h
+
+        # Positionnement immédiat (sans easing)
+        self.camera.position = (target_center_x, target_center_y)
+        print(f"Caméra repositionnée à: ({target_center_x}, {target_center_y})")
+
     def update_camera(self):
         # Suivi fluide: Camera2D.position représente le CENTRE de la caméra
         # En fullscreen, on utilise la taille réelle de l'écran
@@ -544,6 +582,10 @@ class MainScene(arcade.View):
     
     def on_key_press(self, key, modifiers):
         if key == arcade.key.ESCAPE:
+            # Réactiver le toggle fullscreen
+            if hasattr(self.window, 'enable_fullscreen_toggle'):
+                self.window.enable_fullscreen_toggle()
+            
             # Retour au menu
             from scenes.menu_scene import MenuScene
             menu_scene = MenuScene()
