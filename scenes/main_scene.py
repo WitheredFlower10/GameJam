@@ -248,7 +248,7 @@ class MainScene(arcade.View):
                         self.background_texture.width // 2,  # center_x
                         self.background_texture.height // 2,  # center_y
                         self.background_texture,
-                        1.0,  # scale
+                        0.5,  # scale
                         0     # angle
                     )
                 # Sinon draw_texture_rectangle classique

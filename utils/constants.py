@@ -5,7 +5,7 @@ SCREEN_TITLE = "Agent de Missions"
 
 # Paramètres du joueur (Agent)
 AGENT_MOVEMENT_SPEED = 5
-AGENT_SCALE = 2.0
+AGENT_SCALE = 4.2
 AGENT_SCALING = 1.0
 
 # Paramètres du vaisseau
