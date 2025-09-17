@@ -31,15 +31,9 @@ class Agent(arcade.Sprite):
         self.left_pressed = False
         self.right_pressed = False
         self.interact_pressed = False
-        
-        # Limites du monde
-        self.world_width = SCREEN_WIDTH  # Sera mis à jour par la scène
     
     def set_mission_system(self, mission_system):
         self.mission_system = mission_system
-    
-    def set_world_width(self, world_width):
-        self.world_width = world_width
     
     def update(self, delta_time):
         super().update()
@@ -63,12 +57,12 @@ class Agent(arcade.Sprite):
         else:
             self.state = AGENT_STATE_IDLE
         
-        # Empêcher de sortir des limites du monde
+        # Empêcher de sortir des limites du vaisseau
         if self.center_x < 50:
             self.center_x = 50
             self.change_x = 0
-        elif self.center_x > self.world_width - 50:
-            self.center_x = self.world_width - 50
+        elif self.center_x > SCREEN_WIDTH - 50:
+            self.center_x = SCREEN_WIDTH - 50
             self.change_x = 0
     
     def check_interactions(self):
