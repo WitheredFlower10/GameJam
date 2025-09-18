@@ -117,18 +117,6 @@ class SurveillanceScreen:
         top = self.screen_y + self.screen_height
         arcade.draw_lrbt_rectangle_filled(left, right, bottom, top, SCREEN_COLOR)
         
-        # Dessiner le cadre avec la texture "transparent"
-        if self.screen_texture:
-            # Dessiner la texture directement avec les coordonnées
-            try:
-                # Essayer avec draw_lrwh_rectangle_textured
-                arcade.draw_lrwh_rectangle_textured(
-                    left, right, bottom, top, self.screen_texture
-                )
-            except AttributeError:
-                # Fallback: dessiner avec des rectangles colorés
-                arcade.draw_lrbt_rectangle_outline(left, right, bottom, top, arcade.color.LIGHT_GRAY, 5)
-                arcade.draw_lrbt_rectangle_outline(left + 4, right - 4, bottom + 4, top - 4, arcade.color.WHITE, 2)
         
         # Dessiner la mission active (bataille ou exploration)
         if self.hero and self.hero.battle_mission:
@@ -140,7 +128,11 @@ class SurveillanceScreen:
             for sprite in self.background_sprites:
                 if (self.screen_x < sprite.center_x < self.screen_x + self.screen_width and
                     self.screen_y < sprite.center_y < self.screen_y + self.screen_height):
-                    sprite.draw()
+                    # Vérifier si le sprite a une méthode draw, sinon utiliser arcade.draw_sprite
+                    if hasattr(sprite, 'draw'):
+                        sprite.draw()
+                    else:
+                        arcade.draw_sprite(sprite)
 
             # Message quand aucune mission: remplacer par le statut de trajet si en route
             try:
@@ -215,6 +207,25 @@ class SurveillanceScreen:
             except Exception:
                 # Fallback: contour léger si la couleur RGBA n'est pas supportée
                 arcade.draw_lrbt_rectangle_outline(left, right, bottom, top, arcade.color.LIGHT_GRAY, 4)
+        
+        # Dessiner le cadre avec la texture "transparent" PAR-DESSUS tout le contenu
+        if self.screen_texture:
+            # Dessiner la texture directement avec les coordonnées
+            try:
+                # Essayer avec draw_lrwh_rectangle_textured
+                arcade.draw_lrwh_rectangle_textured(
+                    left, right, bottom, top, self.screen_texture
+                )
+                print("Texture transparent affichée comme cadre")
+            except AttributeError:
+                # Fallback: dessiner avec des rectangles colorés
+                arcade.draw_lrbt_rectangle_outline(left, right, bottom, top, arcade.color.LIGHT_GRAY, 5)
+                arcade.draw_lrbt_rectangle_outline(left + 4, right - 4, bottom + 4, top - 4, arcade.color.WHITE, 2)
+        else:
+            print("Aucune texture transparent chargée, utilisation du fallback")
+            # Fallback: dessiner avec des rectangles colorés
+            arcade.draw_lrbt_rectangle_outline(left, right, bottom, top, arcade.color.LIGHT_GRAY, 5)
+            arcade.draw_lrbt_rectangle_outline(left + 4, right - 4, bottom + 4, top - 4, arcade.color.WHITE, 2)
     
     def draw_hero_info(self):
         if not self.hero:

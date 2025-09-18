@@ -57,6 +57,11 @@ class MainScene(arcade.View):
         self.current_ship_section = 1  # 0=Avant, 1=Centre, 2=Arrière
         self.surveillance_was_displayed = False
         self.surveillance_screen_connected = False
+        
+        # Variables pour le mouvement smooth de l'écran de surveillance
+        self.surveillance_target_x = 0
+        self.surveillance_target_y = 0
+        self.surveillance_smooth_factor = 0.08 # Plus petit = plus smooth (0.05-0.2)
 
         
         # Dimensions UI adaptatives (initialisées aux valeurs par défaut)
@@ -87,8 +92,8 @@ class MainScene(arcade.View):
             # Adapter la taille de l'écran de surveillance à la nouvelle résolution
             screen_scale = min(width / 1024, height / 768)  # Échelle basée sur 1024x768
             # +20 px (10 à gauche, 10 à droite)
-            self.surveillance_screen.screen_width = int(400 * screen_scale) + 20
-            self.surveillance_screen.screen_height = int(300 * screen_scale)
+            self.surveillance_screen.screen_width = int(700 * screen_scale) + 20
+            self.surveillance_screen.screen_height = int(400 * screen_scale)
             self.surveillance_screen.screen_x = int(50 * screen_scale)
             self.surveillance_screen.screen_y = int(200 * screen_scale)
             print(f"Écran de surveillance redimensionné: {self.surveillance_screen.screen_width}x{self.surveillance_screen.screen_height}")
@@ -409,18 +414,44 @@ class MainScene(arcade.View):
         screen_x = int((agent_x - cam_x) * zoom + (screen_w / 2))
         screen_y = int((agent_y - cam_y) * zoom + (screen_h / 2))
 
-        # Positionner l'écran de surveillance au-dessus de l'agent
+        # Positionner l'écran de surveillance excentré sur la gauche de l'agent
         offset_y = 350
+        offset_x = -500  # Décalage vers la gauche (négatif = gauche)
         padding_x = 32  # plus de marge gauche/droite
         padding_y = 12  # marge verticale identique
-        desired_x = screen_x - (self.surveillance_screen.screen_width // 2)
+        desired_x = screen_x + offset_x  # Position excentrée sur la gauche
         desired_y = screen_y + offset_y
 
         # Conserver l'écran dans les bornes de l'écran
         max_x = screen_w - self.surveillance_screen.screen_width - padding_x
         max_y = screen_h - self.surveillance_screen.screen_height - padding_y
-        self.surveillance_screen.screen_x = max(padding_x, min(max_x, desired_x))
-        self.surveillance_screen.screen_y = max(padding_y, min(max_y, desired_y))
+        desired_x = max(padding_x, min(max_x, desired_x))
+        desired_y = max(padding_y, min(max_y, desired_y))
+        
+        # Mise à jour des positions cibles
+        self.surveillance_target_x = desired_x
+        self.surveillance_target_y = desired_y
+
+    def _apply_smooth_surveillance_movement(self, delta_time):
+        """Applique un mouvement smooth à l'écran de surveillance avec délai de suivi"""
+        if not self.surveillance_screen:
+            return
+            
+        # Interpolation linéaire vers la position cible
+        current_x = self.surveillance_screen.screen_x
+        current_y = self.surveillance_screen.screen_y
+        
+        # Calculer la distance vers la cible
+        dx = self.surveillance_target_x - current_x
+        dy = self.surveillance_target_y - current_y
+        
+        # Appliquer le mouvement smooth (plus le facteur est petit, plus c'est smooth)
+        smooth_factor = self.surveillance_smooth_factor * (60 * delta_time)  # Normaliser pour 60 FPS
+        smooth_factor = min(1.0, smooth_factor)  # Éviter les overshoots
+        
+        # Mettre à jour la position actuelle
+        self.surveillance_screen.screen_x = current_x + (dx * smooth_factor)
+        self.surveillance_screen.screen_y = current_y + (dy * smooth_factor)
 
     def _sync_mission_overlay_bounds(self):
         # Propager les bornes actuelles de l'écran de surveillance aux missions actives
@@ -662,6 +693,9 @@ class MainScene(arcade.View):
             self.hero.update(delta_time)
             self.mission_system.update(delta_time, self.ship)
             self.surveillance_screen.update(delta_time)
+            
+            # Appliquer le mouvement smooth à l'écran de surveillance
+            self._apply_smooth_surveillance_movement(delta_time)
             
             # Mettre à jour l'animation du héros NPC
             self.ship.update_hero_npc(delta_time)

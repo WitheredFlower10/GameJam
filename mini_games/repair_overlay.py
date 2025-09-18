@@ -102,13 +102,13 @@ class RepairMinigameOverlay:
         # Fond assombri
         arcade.draw_lrbt_rectangle_filled(0, self.window.width, 0, self.window.height, (0, 0, 0, 140))
 
-        # Panneau centré
-        cx = self.window.width // 2
-        cy = self.window.height // 2
-        left = cx - self.panel_w // 2
-        right = cx + self.panel_w // 2
-        bottom = cy - self.panel_h // 2
-        top = cy + self.panel_h // 2
+        # Panneau en bas à droite
+        right = self.window.width - 30
+        left = right - self.panel_w
+        bottom = 30
+        top = bottom + self.panel_h
+        cx = (left + right) // 2
+        cy = (bottom + top) // 2
 
         arcade.draw_lrbt_rectangle_filled(left, right, bottom, top, arcade.color.DARK_SLATE_GRAY)
         arcade.draw_lrbt_rectangle_outline(left, right, bottom, top, arcade.color.LIGHT_GRAY, 3)

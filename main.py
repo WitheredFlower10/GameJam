@@ -15,7 +15,8 @@ class MissionAgentGame(arcade.Window):
             super().__init__(w, h, SCREEN_TITLE, resizable=False)            
             arcade.set_background_color(arcade.color.DARK_BLUE_GRAY)
         else:
-            super().__init__(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE, resizable=False)
+            super().__init__(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE, fullscreen=True)
+            arcade.set_background_color(arcade.color.DARK_BLUE_GRAY)
         
         
     def setup(self):

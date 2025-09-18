@@ -32,6 +32,9 @@ class ExploreMission:
         # Animation système pour le héros
         self.hero_walk_textures = []
         self.hero_animation_index = 0
+        
+        # Charger la texture d'ennemi (sera chargée dans setup())
+        self.enemy_texture = None
         self.hero_animation_timer = 0.0
         self.hero_animation_speed = 0.3  # secondes par frame
         self.hero_is_moving = False
@@ -130,6 +133,9 @@ class ExploreMission:
         self.original_hero_change_y = getattr(self.hero, 'change_y', 0)
         self.original_hero_scale = getattr(self.hero, 'scale', 1.0)
 
+        # Charger la texture d'ennemi
+        self.enemy_texture = self._load_enemy_texture()
+        
         # Réduire la taille du héros pour cette mission seulement
         self.hero.scale = 0.5  # Diviser la taille par 2
 
@@ -600,9 +606,20 @@ class ExploreMission:
                         break
                 if ok:
                     enemy = arcade.Sprite()
-                    enemy.texture = arcade.make_soft_square_texture(8, (255, 0, 0), outer_alpha=255)
-                    enemy.center_x = x
-                    enemy.center_y = y
+                    if self.enemy_texture:
+                        enemy.texture = self.enemy_texture
+                        # Ajuster la taille pour que l'ennemi soit bien proportionné
+                        enemy.scale = 0.3  # Ajuster selon la taille de l'image
+                        # Positionner l'ennemi avec les pieds sur le sol/plateforme
+                        enemy.center_x = x
+                        enemy.center_y = y + 8  # Ajustement fixe pour les pieds sur le sol
+                        print(f"Ennemi créé avec texture PNG à ({x}, {y + 7})")
+                    else:
+                        # Fallback si la texture n'est pas chargée
+                        enemy.texture = arcade.make_soft_square_texture(8, (255, 0, 0), outer_alpha=255)
+                        enemy.center_x = x
+                        enemy.center_y = y
+                        print(f"Ennemi créé avec fallback rouge à ({x}, {y})")
                     self.enemy_list.append(enemy)
                     placed_positions.append((x, y))
                     ground_placed += 1
@@ -629,9 +646,21 @@ class ExploreMission:
                             break
                     if ok:
                         enemy = arcade.Sprite()
-                        enemy.texture = arcade.make_soft_square_texture(8, (255, 0, 0), outer_alpha=255)
-                        enemy.center_x = x
-                        enemy.center_y = y
+                        if self.enemy_texture:
+                            enemy.texture = self.enemy_texture
+                            # Ajuster la taille pour que l'ennemi soit bien proportionné
+                            enemy.scale = 0.3  # Ajuster selon la taille de l'image
+                            # Positionner l'ennemi avec les pieds sur le sol/plateforme
+                            enemy.center_x = x
+                            enemy.center_y = y + 8  # Ajustement fixe pour les pieds sur le sol
+                            # Ajuster la hitbox pour qu'elle soit touchable 5px plus haut
+                            print(f"Ennemi créé avec texture PNG à ({x}, {y + 7})")
+                        else:
+                            # Fallback si la texture n'est pas chargée
+                            enemy.texture = arcade.make_soft_square_texture(8, (255, 0, 0), outer_alpha=255)
+                            enemy.center_x = x
+                            enemy.center_y = y
+                            print(f"Ennemi créé avec fallback rouge à ({x}, {y})")
                         self.enemy_list.append(enemy)
                         placed_positions.append((x, y))
                         placed = True
@@ -685,6 +714,29 @@ class ExploreMission:
         # Si on a des textures, utiliser la première comme texture par défaut
         if self.hero_walk_textures and hasattr(self.hero, 'texture'):
             self.hero.texture = self.hero_walk_textures[0]
+    
+    def _load_enemy_texture(self):
+        """Charge la texture d'ennemi walking_enemie.png"""
+        # Cherche les assets dans différents emplacements possibles
+        base_candidates = [
+            'assets',
+            os.path.join(os.path.dirname(__file__), '..', 'assets'),
+        ]
+        base_candidates = [os.path.normpath(p) for p in base_candidates]
+        
+        for base in base_candidates:
+            # Chercher dans le dossier enemies/
+            enemy_path = os.path.join(base, 'enemies', 'walking_enemie.png')
+            if os.path.exists(enemy_path):
+                try:
+                    texture = arcade.load_texture(enemy_path)
+                    print(f"Texture ennemis chargée: {enemy_path}")
+                    return texture
+                except Exception as e:
+                    print(f"Erreur chargement texture ennemis {enemy_path}: {e}")
+        
+        print("Texture walking_enemie.png non trouvée, utilisation du fallback")
+        return None
     
     def _update_hero_animation(self, delta_time):
         """Met à jour l'animation de marche du héros - inspiré de l'agent"""
