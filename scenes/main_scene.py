@@ -50,7 +50,7 @@ class MainScene(arcade.View):
         # Texture d'arrière-plan (monde)
         self.background_texture = None
         # Décalage vertical du background (positif = vers le haut, négatif = vers le bas)
-        self.background_y_offset = -5
+        self.background_y_offset = 100
         
         # État du jeu
         self.game_state = GAME_STATE_PLAYING
@@ -241,8 +241,9 @@ class MainScene(arcade.View):
                 
         # Si rien trouvé, créer un monde de 4000px par défaut
         print("Aucun background trouvé, utilisation d'un monde 4000px")
+        w,h = arcade.get_display_size()
         self.world_width = 4000
-        self.world_height = 1024  # Hauteur par défaut adaptée au background
+        self.world_height = h  # Hauteur par défaut adaptée au background
         self.world_left = 0
         self.world_right = 4000  # Limite exacte du monde
 
