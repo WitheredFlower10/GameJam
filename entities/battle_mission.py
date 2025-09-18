@@ -556,7 +556,7 @@ class BattleMission:
         for boss_bullet in list(self.boss_bullet_list):
             if arcade.check_for_collision(boss_bullet, self.player_sprite):
                 boss_bullet.remove_from_sprite_lists()
-                damage = 10
+                damage = 20
                 self.hero.health = max(0, self.hero.health - damage)
                 if self.hero.health <= 0:
                     # Déclencher l'effet de défaite du héros (même logique que les autres)
