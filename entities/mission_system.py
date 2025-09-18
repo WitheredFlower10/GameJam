@@ -29,7 +29,7 @@ class MissionSystem:
         
         # Timer de pari forcé
         self.betting_timer = None  # Temps de fin du timer
-        self.betting_timer_duration = 5.0  # 30 secondes
+        self.betting_timer_duration = 30.0  # 30 secondes
         self.betting_forced = False  # Flag pour indiquer si le pari est forcé
 
         # Ordonnancement des missions
