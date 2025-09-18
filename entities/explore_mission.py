@@ -25,9 +25,9 @@ class ExploreMission:
         self.mission_completed = False
         self.success = False
 
-        self.gravity = 0.5
-        self.move_speed = 0.7
-        self.jump_strength = 8.0
+        self.gravity = 0.3  # Équilibrée avec jump_strength 20.0 pour atteindre 80 pixels de hauteur
+        self.move_speed = 0.75
+        self.jump_strength = 8.5  # Ajustée pour atteindre la hauteur de saut de 80 pixels
         
         # Animation système pour le héros
         self.hero_walk_textures = []
@@ -43,8 +43,8 @@ class ExploreMission:
         self.hero_platform_level = 0  # Niveau de la plateforme actuelle
         self._load_hero_textures()
         
-        # Système de hauteurs standardisées (divisé par 2) avec plus de niveaux
-        self.jump_height = 25  # Hauteur qu'un saut peut atteindre (en pixels)
+        # Système de hauteurs standardisées adaptées à la nouvelle taille du héros PNG
+        self.jump_height = 80  # Hauteur qu'un saut peut atteindre (en pixels) - comme demandé
         # Overlay bounds (can be updated by the scene)
         self.overlay_x = SURVEILLANCE_SCREEN_X
         self.overlay_y = SURVEILLANCE_SCREEN_Y
@@ -56,7 +56,6 @@ class ExploreMission:
             self.overlay_y + 15 + self.jump_height * 2,  # Niveau 2
             self.overlay_y + 15 + self.jump_height * 3,  # Niveau 3
             self.overlay_y + 15 + self.jump_height * 4,  # Niveau 4
-            self.overlay_y + 15 + self.jump_height * 5,  # Niveau 5
         ]
         self.last_shot_time = 0
         self.last_enemy_shot = 0  # Pour les tirs d'ennemis
@@ -71,6 +70,7 @@ class ExploreMission:
         self.artifact_chance = 0.01 # 1% de chance d'apparition d'artefact
         self.evaluated_platforms = set()  # Plateformes déjà évaluées pour le saut
         self.min_enemy_spacing = 30
+        self.last_random_jump_time = 0  # Temps du dernier saut aléatoire
 
         self.start_mission()
     
@@ -135,7 +135,7 @@ class ExploreMission:
 
         # Charger la texture d'ennemi
         self.enemy_texture = self._load_enemy_texture()
-        
+
         # Réduire la taille du héros pour cette mission seulement
         self.hero.scale = 0.25  # Diviser la taille par 4 (2 fois plus petit que précédemment)
 
@@ -177,8 +177,11 @@ class ExploreMission:
             self.duration_expired = True
             self.force_artifact_next = True
 
-        # Vérifier si le héros atteint le bord droit de l'écran
-        if self.hero.center_x >= self.overlay_x + self.overlay_w - 20:
+        # Vérifier si le héros atteint le bord droit de l'écran (seulement s'il est au sol/sur plateforme)
+        current_velocity_y = getattr(self.hero, 'temp_velocity_y', 0)
+        if (self.hero.center_x >= self.overlay_x + self.overlay_w - 20 and 
+            (self.hero_on_platform or self._is_hero_on_ground()) and
+            current_velocity_y >= 0):  # Pas en train de tomber
             self.teleport_hero_and_regenerate()
 
         # Auto-contrôle du héros: avancer, sauter parfois (uniquement si cette mission est active)
@@ -206,10 +209,13 @@ class ExploreMission:
                 platform_left = platform.center_x - platform_width / 2
                 platform_top = platform.center_y + platform_height / 2
                 
-                # Déterminer le niveau actuel du héros
+                # Déterminer le niveau actuel du héros (plus robuste)
                 hero_current_level = 0  # Par défaut au sol
+                hero_width, hero_height = self._get_hero_dimensions()
+                hero_bottom = self.hero.center_y - hero_height / 2
+                
                 for i, level_y in enumerate(self.platform_levels):
-                    if abs(self.hero.center_y - level_y) < 10:  # Tolérance de 10 pixels
+                    if abs(hero_bottom - level_y) < 15:  # Tolérance de 15 pixels pour les pieds
                         hero_current_level = i
                         break
                 
@@ -221,19 +227,18 @@ class ExploreMission:
                         break
                 
                 # Conditions pour sauter :
-                # 1. Le héros doit être à gauche du côté gauche de la plateforme
+                # 1. Le héros doit être proche de la plateforme
                 # 2. La plateforme doit être EXACTEMENT 1 niveau au-dessus du héros
                 # 3. La plateforme doit être dans une distance raisonnable devant le héros
                 hero_distance_to_platform = platform_left - self.hero.center_x
                 
-                if (self.hero.center_x < platform_left and  # Héros à gauche du côté gauche
-                    platform_level == hero_current_level + 1 and  # Exactement 1 niveau au-dessus
-                    0 < hero_distance_to_platform < 20):    # Distance raisonnable (0-20 pixels)
+                if (platform_level == hero_current_level + 1 and  # Exactement 1 niveau au-dessus
+                    -10 < hero_distance_to_platform < 40):    # Distance plus large (-10 à 40 pixels)
                     
                     # Marquer cette plateforme comme évaluée
                     self.evaluated_platforms.add(platform_id)
                     
-                    # 50% de chance de sauter (une seule fois par plateforme)
+                    # 80% de chance de sauter (une seule fois par plateforme)
                     if random.random() < 0.8:
                         should_jump = True
                         break
@@ -247,10 +252,17 @@ class ExploreMission:
                         should_jump = False
                 except Exception:
                     pass
-
-            # Saut intelligent seulement (pas de saut aléatoire)
+            
+            # Saut intelligent ou saut aléatoire occasionnel
             if (should_jump and current_velocity_y == 0):
                 current_velocity_y = self.jump_strength
+                print(f"Héros saute intelligemment! Force: {self.jump_strength}")
+            elif (current_velocity_y == 0 and 
+                  time.time() - self.last_random_jump_time > 2.0 and  # Délai minimum de 2 secondes
+                  random.random() < 0.02):  # 2% de chance de saut aléatoire
+                current_velocity_y = self.jump_strength
+                self.last_random_jump_time = time.time()  # Reset du timer
+                print(f"Héros saute aléatoirement! Force: {self.jump_strength}")
             
             # Gravité
             current_velocity_y -= self.gravity
@@ -471,6 +483,7 @@ class ExploreMission:
 
     def teleport_hero_and_regenerate(self):
         """Téléporte le héros à gauche et génère un nouveau pattern"""
+        print(f"Téléportation du héros - Position: ({self.hero.center_x}, {self.hero.center_y}), Au sol: {self._is_hero_on_ground()}, Sur plateforme: {self.hero_on_platform}")
         # Téléporter le héros au début de l'écran (niveau sol) - pieds sur le sol
         self.hero.center_x = self.overlay_x + 20
         self._position_hero_on_ground(self.platform_levels[0])
@@ -492,22 +505,22 @@ class ExploreMission:
 
     def generate_new_pattern(self):
         """Génère un nouveau pattern de plateformes, ennemis et artefacts"""
-        # Sol de base (divisé par 2)
+        # Sol de base adapté au héros PNG
         ground = arcade.Sprite()
-        ground.texture = arcade.make_soft_square_texture(10, (0, 100, 0), outer_alpha=255)  # Vert foncé explicite
-        # Rétrécir légèrement le sol pour éviter qu'il ne touche les bords (8 px de chaque côté)
-        ground.scale_x = max(0, (self.overlay_w - 10) / 10)
+        ground.texture = arcade.make_soft_square_texture(15, (0, 100, 0), outer_alpha=255)  # Vert foncé, taille adaptée
+        # Rétrécir légèrement le sol pour éviter qu'il ne touche les bords
+        ground.scale_x = max(0, (self.overlay_w - 10) / 15)
         ground.scale_y = 1
         ground.center_x = self.overlay_x + self.overlay_w // 2
         ground.center_y = self.overlay_y + 10
         self.platform_list.append(ground)
         
         # Plateformes à hauteurs standardisées avec génération intelligente
-        num_platforms = random.randint(8, 14)
+        num_platforms = random.randint(4, 8)  # Réduit pour s'adapter à la hauteur de saut de 80
         platforms_info = []  # Pour éviter les superpositions
         
         # Générer une progression logique de niveaux
-        max_level = random.randint(3, len(self.platform_levels) - 1)  # Niveau maximum pour ce pattern
+        max_level = random.randint(1, 3)  # Limité aux 3 premiers niveaux avec hauteur de saut de 80
         available_levels = list(range(1, max_level + 1))  # Niveaux 1 à max_level
         
         # S'assurer qu'il y a au moins une plateforme de chaque niveau jusqu'au maximum
@@ -526,8 +539,8 @@ class ExploreMission:
         for i, level in enumerate(guaranteed_platforms):
             attempts = 0
             while attempts < 10:  # Limite les tentatives pour éviter boucle infinie
-                width = random.randint(30, 60)  # Largeur divisée par 2
-                height = 8  # Hauteur divisée par 2
+                width = random.randint(40, 80)  # Largeur adaptée au héros PNG
+                height = 12  # Hauteur adaptée au héros PNG
                 x = self.overlay_x + random.randint(40, self.overlay_w - 70)  # Éviter les 50px à droite
                 
                 y = self.platform_levels[level]
@@ -536,15 +549,15 @@ class ExploreMission:
                 overlap = False
                 for existing in platforms_info:
                     # Vérifier seulement la superposition horizontale puisque les hauteurs sont standardisées
-                    if (abs(x - existing['x']) < (width + existing['width']) / 2 + 15):  # Espacement divisé par 2
+                    if (abs(x - existing['x']) < (width + existing['width']) / 2 + 20):  # Espacement adapté au héros PNG
                         overlap = True
                         break
                 
                 if not overlap:
                     platform = arcade.Sprite()
-                    platform.texture = arcade.make_soft_square_texture(8, (139, 69, 19), outer_alpha=255)  # Marron explicite, taille divisée par 2
-                    platform.scale_x = width / 8
-                    platform.scale_y = height / 8
+                    platform.texture = arcade.make_soft_square_texture(12, (139, 69, 19), outer_alpha=255)  # Marron, taille adaptée au héros PNG
+                    platform.scale_x = width / 12
+                    platform.scale_y = height / 12
                     platform.center_x = x
                     platform.center_y = y
                     self.platform_list.append(platform)
@@ -680,7 +693,7 @@ class ExploreMission:
             artifact.center_x = self.overlay_x + random.randint(int(right_min), int(right_max))
             artifact.center_y = self.platform_levels[0]
             self.artifact_list.append(artifact)
-    
+
     def _load_hero_textures(self):
         """Charge les textures d'animation de marche du héros"""
         # Cherche les assets dans différents emplacements possibles
@@ -785,7 +798,6 @@ class ExploreMission:
             self.overlay_y + 15 + self.jump_height * 2,
             self.overlay_y + 15 + self.jump_height * 3,
             self.overlay_y + 15 + self.jump_height * 4,
-            self.overlay_y + 15 + self.jump_height * 5,
         ]
         # Translate existing sprites to match overlay move
         def shift_list(sprite_list, dx, dy):

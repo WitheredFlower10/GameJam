@@ -183,6 +183,10 @@ class BattleMission:
         self.hero = hero
         self.player_sprite = None
         
+        # Charger les textures pour les ennemis et le héros
+        self.enemy_texture = self._load_enemy_texture()
+        self.hero_ship_texture = self._load_hero_ship_texture()
+        
         # Callbacks pour les scènes de fin de jeu
         self.on_game_over_callback = on_game_over_callback
         self.on_game_end_callback = on_game_end_callback
@@ -237,8 +241,17 @@ class BattleMission:
         self.boss_bullet_list = arcade.SpriteList()
         self.explosion_list = arcade.SpriteList()
 
-        # Héros de la mission (utilise l'instance Hero passée)
-        self.player_sprite = self.hero
+        # Héros de la mission (crée un nouveau sprite avec la texture du vaisseau)
+        self.player_sprite = arcade.Sprite()
+        if self.hero_ship_texture:
+            self.player_sprite.texture = self.hero_ship_texture
+            self.player_sprite.scale = 0.4  # Ajuster la taille selon l'image
+            print("Vaisseau héros créé avec texture PNG")
+        else:
+            # Fallback si la texture n'est pas chargée
+            self.player_sprite.texture = arcade.make_soft_square_texture(40, arcade.color.BLUE, outer_alpha=255)
+            print("Vaisseau héros créé avec fallback bleu")
+        
         self.player_sprite.center_x = self.overlay_x + 60
         self.player_sprite.center_y = self.overlay_y + self.overlay_h // 2
         self.player_list.append(self.player_sprite)
@@ -360,7 +373,16 @@ class BattleMission:
 
         # Spawn d'ennemis (désactivé quand le boss est présent)
         if (not self.boss_active) and (time.time() - self.last_enemy_spawn > SPAWN_INTERVAL):
-            enemy = arcade.SpriteSolidColor(30, 30, arcade.color.RED)
+            enemy = arcade.Sprite()
+            if self.enemy_texture:
+                enemy.texture = self.enemy_texture
+                enemy.scale = 0.3  # Ajuster la taille selon l'image
+                print("Ennemi volant créé avec texture PNG")
+            else:
+                # Fallback si la texture n'est pas chargée
+                enemy.texture = arcade.make_soft_square_texture(30, arcade.color.RED, outer_alpha=255)
+                print("Ennemi volant créé avec fallback rouge")
+            
             # Spawn encore 20px plus à gauche (désormais à l'intérieur de l'overlay)
             enemy.center_x = self.overlay_x + self.overlay_w - 20
             enemy.center_y = random.randint(
@@ -732,3 +754,48 @@ class BattleMission:
                 self.boss_sprite.center_y += dy
             except Exception:
                 pass
+    
+    def _load_enemy_texture(self):
+        """Charge la texture d'ennemi flying_enemie.png"""
+        # Cherche les assets dans différents emplacements possibles
+        base_candidates = [
+            'assets',
+            os.path.join(os.path.dirname(__file__), '..', 'assets'),
+        ]
+        base_candidates = [os.path.normpath(p) for p in base_candidates]
+        
+        for base in base_candidates:
+            # Chercher dans le dossier enemies/
+            enemy_path = os.path.join(base, 'enemies', 'flying_enemie.png')
+            if os.path.exists(enemy_path):
+                try:
+                    texture = arcade.load_texture(enemy_path)
+                    print(f"Texture ennemis volants chargée: {enemy_path}")
+                    return texture
+                except Exception as e:
+                    print(f"Erreur chargement texture ennemis {enemy_path}: {e}")
+        
+        print("Texture flying_enemie.png non trouvée, utilisation du fallback")
+        return None
+    
+    def _load_hero_ship_texture(self):
+        """Charge la texture du vaisseau du héros hero_ship.png"""
+        # Cherche les assets dans différents emplacements possibles
+        base_candidates = [
+            'assets',
+            os.path.join(os.path.dirname(__file__), '..', 'assets'),
+        ]
+        base_candidates = [os.path.normpath(p) for p in base_candidates]
+        
+        for base in base_candidates:
+            hero_path = os.path.join(base, 'hero_ship.png')
+            if os.path.exists(hero_path):
+                try:
+                    texture = arcade.load_texture(hero_path)
+                    print(f"Texture vaisseau héros chargée: {hero_path}")
+                    return texture
+                except Exception as e:
+                    print(f"Erreur chargement texture vaisseau héros {hero_path}: {e}")
+        
+        print("Texture hero_ship.png non trouvée, utilisation du fallback")
+        return None
