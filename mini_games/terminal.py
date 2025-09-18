@@ -210,36 +210,44 @@ class MainTerminal:
     def _draw_info(self, x, y, w, h, term_green, font_terminal):
         import textwrap
         state = self.info_state
-    # Générer le contenu une seule fois
+        
         if not state['lines']:
-            # Texte en français, sans accents, mais toujours en français
+            import random
+            energie = random.randint(40, 100)
+            etat_mental = random.choice([
+                "Stable", "Stresse", "Fatigue", "Motivé", "Déprimé", "Concentre", "Agité", "Serein"
+            ])
+            ennemi_force = random.choice([
+                "Superieur", "Inferieur", "Equilibre", "Rapide", "Nombreux", "Bien equipe"
+            ])
+            ennemi_faiblesse = random.choice([
+                "Defense faible", "Lent", "Desorganise", "Peu d'armes", "Mauvaise vision", "Peu de moral"
+            ])
             info_text = (
-                "Analyse des donnees :\n"
-                "Heros :\n"
-                "- Energie : 8*%\n"
-                "- Etat mental : S**ide\n"
-                "Ennemi :\n"
-                "- Forces : Supe**eur\n"
-                "- Faiblesses : De**ense faible\n"
-                "(Appuyez sur Entree pour revenir au terminal)"
+                f"Analyse des donnees :\n"
+                f"Heros :\n"
+                f"- Energie : {energie}%\n"
+                f"- Etat mental : {etat_mental}\n"
+                f"Ennemi :\n"
+                f"- Forces : {ennemi_force}\n"
+                f"- Faiblesses : {ennemi_faiblesse}\n"
+                f"(Appuyez sur Entree pour revenir au terminal)"
             )
-            # Découper par ligne
             state['lines'] = info_text.split('\n')
-    # Affichage
+        lines = state['lines']
         arcade.draw_lrbt_rectangle_filled(x, x+w, y, y+h, (0, 0, 0, 230))
         arcade.draw_lrbt_rectangle_outline(x, x+w, y, y+h, term_green, 2)
         arcade.draw_text("Notice", x+18, y+h-38, term_green, 18, font_name=font_terminal, bold=True)
         option_gap = 22
         max_lines = 9
         y_draw = y+h-70
-        for line in state['lines'][:max_lines]:
+        for line in lines[:max_lines]:
             for subline in textwrap.wrap(line, width=48):
                 arcade.draw_text(subline, x+32, y_draw, term_green, 14, font_name=font_terminal)
                 y_draw -= option_gap
-    # Affichage défilant si besoin (à étendre si nécessaire)
 
     def _reset_info(self):
-        self.info_state['lines'] = []
+        self.info_state['lines'] = []  
         self.info_state['state'] = 'showing'
     def on_text(self, text):
         if self.sub_view == 'fortune':
@@ -430,3 +438,4 @@ class MainTerminal:
             "Connexion distante chiffree. Vous devez dechiffrer le mot de passe. Entrez une lettre et appuyez sur Entree pour commencer a deviner. une lettre du mot de passe, vous avez 15 tentatives pour deviner tous les lettres."
         ]
         
+
