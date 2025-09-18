@@ -3,7 +3,31 @@ import math
 from utils.constants import SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE
 
 
-class MenuScene(arcade.View):
+class StarBackgroundMixin:
+    """Mixin class pour ajouter un fond étoilé aux scènes"""
+    
+    def draw_star_background(self):
+        """Dessine les étoiles en arrière-plan"""
+        if hasattr(self.window, 'stars'):
+            for star in self.window.stars:
+                # Calculer le scintillement
+                star['twinkle_phase'] += star['twinkle_speed']
+                twinkle_factor = 0.7 + 0.3 * abs(star['twinkle_phase'] % (2 * 3.14159))
+                twinkle_alpha = int(star['alpha'] * twinkle_factor)
+                
+                # S'assurer que l'alpha reste entre 0 et 255
+                twinkle_alpha = max(0, min(255, twinkle_alpha))
+                
+                # Dessiner l'étoile avec la couleur de base et l'alpha calculé
+                arcade.draw_circle_filled(
+                    star['x'], 
+                    star['y'], 
+                    star['size'], 
+                    (*star['color'], twinkle_alpha)
+                )
+
+
+class MenuScene(arcade.View, StarBackgroundMixin):
     
     def __init__(self):
         super().__init__()
@@ -156,6 +180,9 @@ class MenuScene(arcade.View):
     def on_draw(self):
         self.clear()
         
+        # Dessiner le fond étoilé
+        self.draw_star_background()
+        
         # Créer les objets Text au premier draw (quand le canvas est attaché)
         if not self.text_objects_created:
             self.create_text_objects()
@@ -191,27 +218,45 @@ class MenuScene(arcade.View):
             )
     
     def draw_space_background(self):
-        """ Fond étoilé coloré avec effet galaxie - adapté au fullscreen """
-        screen_w = self.window.width
-        screen_h = self.window.height
-        
-        for i in range(200):
-            x = (i * 37 + int(self.animation_timer * 1.5)) % screen_w
-            y = (i * 73) % screen_h
-            size = 1 + (i % 3)
-            # Couleurs variées pour un effet cosmique
-            if i % 5 == 0:
-                color = (200, 200, 255)  # bleu clair
-            elif i % 3 == 0:
-                color = (255, 150, 255)  # violet
-            else:
-                twinkle = int(128 + 127 * math.sin(self.animation_timer * 0.05 + i))
-                color = (twinkle, twinkle, twinkle)
-            arcade.draw_circle_filled(x, y, size, color)
-        
-        # Effet "scanlines" rétro adaptatif
-        for y in range(0, screen_h, 4):
-            arcade.draw_line(0, y, screen_w, y, (0, 0, 0, 40), 1)
+         """ Fond étoilé coloré avec effet galaxie - adapté au fullscreen """
+         screen_w = self.window.width
+         screen_h = self.window.height
+         
+         # Dessiner les étoiles générées depuis le main en premier
+         if hasattr(self.window, 'stars'):
+             for star in self.window.stars:
+                 # Calculer le scintillement
+                 star['twinkle_phase'] += star['twinkle_speed']
+                 twinkle_factor = 0.7 + 0.3 * abs(star['twinkle_phase'] % (2 * 3.14159))
+                 twinkle_alpha = int(star['alpha'] * twinkle_factor)
+                 
+                 # S'assurer que l'alpha reste entre 0 et 255
+                 twinkle_alpha = max(0, min(255, twinkle_alpha))
+                 
+                 # Dessiner l'étoile avec la couleur de base et l'alpha calculé
+                 arcade.draw_circle_filled(
+                     star['x'], 
+                     star['y'], 
+                     star['size'], 
+                     (*star['color'], twinkle_alpha)
+                 )
+         
+         # Créer un dégradé radial pour l'effet galaxie
+         center_x = screen_w // 2
+         center_y = screen_h // 2
+         max_radius = max(screen_w, screen_h)
+         
+         # Dessiner plusieurs cercles avec transparence pour l'effet de nébuleuse
+         for i in range(20):
+             radius = max_radius * (1 - i * 0.05)
+             alpha = int(30 * (1 - i * 0.05))  # Transparence décroissante
+             color = (
+                 min(255, 20 + i * 5),    # Rouge
+                 min(255, 10 + i * 3),    # Vert
+                 min(255, 40 + i * 8),    # Bleu
+                 alpha
+             )
+             arcade.draw_circle_filled(center_x, center_y, radius, color)
     
     def draw_fallback_text(self):
         """Méthode fallback en cas de problème avec les objets Text"""

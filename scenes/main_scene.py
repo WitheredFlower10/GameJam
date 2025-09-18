@@ -252,6 +252,7 @@ class MainScene(arcade.View):
 
         # Dessiner le vaisseau et l'agent
         self.camera.use()
+        self.draw_star_background()
         self.draw_background()
         self.ship.draw()
         
@@ -398,6 +399,81 @@ class MainScene(arcade.View):
         arcade.draw_text("ÉCHAP: Retour au menu", 
                         self.ui_width - 200, 30, arcade.color.LIGHT_GRAY, 12)
 
+    def draw_star_background(self):
+        """Dessine les étoiles en arrière-plan"""
+        if hasattr(self.window, 'stars'):
+            for star in self.window.stars:
+                # Calculer le scintillement
+                star['twinkle_phase'] += star['twinkle_speed']
+                twinkle_factor = 0.7 + 0.3 * abs(star['twinkle_phase'] % (2 * 3.14159))
+                twinkle_alpha = int(star['alpha'] * twinkle_factor)
+                
+                # S'assurer que l'alpha reste entre 0 et 255
+                twinkle_alpha = max(0, min(255, twinkle_alpha))
+                
+                # Dessiner l'étoile avec la couleur de base et l'alpha calculé
+                arcade.draw_circle_filled(
+                    star['x'], 
+                    star['y'], 
+                    star['size'], 
+                    (*star['color'], twinkle_alpha)
+                )
+
+    def draw_background(self):
+        """Dessine le background du monde - méthode forcée pour position absolue"""
+        if self.background_texture:
+            # Utiliser la méthode la plus directe possible
+            try:
+                # Essayer draw_scaled_texture_rectangle si disponible
+                if hasattr(arcade, "draw_scaled_texture_rectangle"):
+                    arcade.draw_scaled_texture_rectangle(
+                        self.background_texture.width // 2,  # center_x
+                        (self.background_texture.height // 2) + self.background_y_offset,  # center_y avec décalage
+                        self.background_texture,
+                        1.0,  # scale
+                        0     # angle
+                    )
+                # Sinon draw_texture_rectangle classique
+                elif hasattr(arcade, "draw_texture_rectangle"):
+                    arcade.draw_texture_rectangle(
+                        self.background_texture.width // 2,  # center_x
+                        (self.background_texture.height // 2) + self.background_y_offset,  # center_y avec décalage
+                        self.background_texture.width,  # width
+                        self.background_texture.height,  # height
+                        self.background_texture
+                    )
+                # Méthode lrwh si disponible
+                elif hasattr(arcade, "draw_lrwh_rectangle_textured"):
+                    arcade.draw_lrwh_rectangle_textured(
+                        0, self.background_texture.width,  # left, right
+                        0 + self.background_y_offset, self.background_texture.height + self.background_y_offset,  # bottom, top avec décalage
+                        self.background_texture
+                    )
+                else:
+                    # Fallback Sprite avec reset forcé
+                    self._bg_sprite_list = arcade.SpriteList()  # Reset à chaque frame
+                    bg_sprite = arcade.Sprite()
+                    bg_sprite.texture = self.background_texture
+                    bg_sprite.left = 0
+                    bg_sprite.bottom = 0 + self.background_y_offset
+                    self._bg_sprite_list.append(bg_sprite)
+                    self._bg_sprite_list.draw()
+                    
+            except Exception as e:
+                print(f"Erreur dessin background: {e}")
+                # Fallback: fond coloré simple
+                arcade.draw_lrbt_rectangle_filled(
+                    0, self.world_width, 0, self.world_height,
+                    arcade.color.DARK_BLUE_GRAY
+                )
+        else:
+            # Pas de texture : fond simple
+            arcade.draw_lrbt_rectangle_filled(
+                0, self.world_width, 0, self.world_height,
+                arcade.color.BLACK
+            )
+
+
     def _update_surveillance_screen_position(self):
         # Convertir la position monde de l'agent en coordonnées écran (Camera2D centrée)
         screen_w = self.window.width
@@ -482,61 +558,6 @@ class MainScene(arcade.View):
             anchor_x="center",
             bold=True
         )
-
-    def draw_background(self):
-        """Dessine le background du monde - méthode forcée pour position absolue"""
-        if self.background_texture:
-            # Utiliser la méthode la plus directe possible
-            try:
-                # Essayer draw_scaled_texture_rectangle si disponible
-                if hasattr(arcade, "draw_scaled_texture_rectangle"):
-                    arcade.draw_scaled_texture_rectangle(
-                        self.background_texture.width // 2,  # center_x
-                        (self.background_texture.height // 2) + self.background_y_offset,  # center_y avec décalage
-                        self.background_texture,
-                        1.0,  # scale
-                        0     # angle
-                    )
-                # Sinon draw_texture_rectangle classique
-                elif hasattr(arcade, "draw_texture_rectangle"):
-                    arcade.draw_texture_rectangle(
-                        self.background_texture.width // 2,  # center_x
-                        (self.background_texture.height // 2) + self.background_y_offset,  # center_y avec décalage
-                        self.background_texture.width,  # width
-                        self.background_texture.height,  # height
-                        self.background_texture
-                    )
-                # Méthode lrwh si disponible
-                elif hasattr(arcade, "draw_lrwh_rectangle_textured"):
-                    arcade.draw_lrwh_rectangle_textured(
-                        0, self.background_texture.width,  # left, right
-                        0 + self.background_y_offset, self.background_texture.height + self.background_y_offset,  # bottom, top avec décalage
-                        self.background_texture
-                    )
-                else:
-                    # Fallback Sprite avec reset forcé
-                    self._bg_sprite_list = arcade.SpriteList()  # Reset à chaque frame
-                    bg_sprite = arcade.Sprite()
-                    bg_sprite.texture = self.background_texture
-                    bg_sprite.left = 0
-                    bg_sprite.bottom = 0 + self.background_y_offset
-                    self._bg_sprite_list.append(bg_sprite)
-                    self._bg_sprite_list.draw()
-                    
-            except Exception as e:
-                print(f"Erreur dessin background: {e}")
-                # Fallback: fond coloré simple
-                arcade.draw_lrbt_rectangle_filled(
-                    0, self.world_width, 0, self.world_height,
-                    arcade.color.DARK_BLUE_GRAY
-                )
-        else:
-            # Pas de texture : fond simple
-            arcade.draw_lrbt_rectangle_filled(
-                0, self.world_width, 0, self.world_height,
-                arcade.color.BLACK
-            )
-
 
     def draw_betting_interface(self):
         # Interface de paris en overlay
@@ -950,4 +971,3 @@ class MainScene(arcade.View):
             self.mission_system.terminal_on = False
             self.terminal = None
             print("Terminal fermé.")
-            
