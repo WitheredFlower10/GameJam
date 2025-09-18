@@ -27,9 +27,14 @@ class MissionAgentGame(arcade.Window):
     def generate_stars(self):
         """Génère les étoiles pour le fond spatial"""
         self.stars = []
+        # Utiliser les dimensions du monde au lieu de la taille de la fenêtre
+        # pour couvrir toute la surface de la grande scène
+        world_width = 4000  # Largeur du monde définie dans MainScene
+        world_height = 1024  # Hauteur du monde définie dans MainScene
+        
         for _ in range(STAR_COUNT):
-            x = random.randint(0, self.width)
-            y = random.randint(0, self.height)
+            x = random.randint(0, world_width)
+            y = random.randint(0, world_height)
             size = random.randint(STAR_MIN_SIZE, STAR_MAX_SIZE)
             color = random.choice(STAR_COLORS)
             # Ajouter un léger scintillement (alpha variable)
