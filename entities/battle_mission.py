@@ -197,8 +197,8 @@ class BattleMission:
         self.is_active = False
         self.mission_completed = False
         self.enemies_destroyed = 0
-        # Nombre d'ennemis choisi aléatoirement entre 20 et 30 (le boss compte comme 1 ennemi)
-        self.enemies_to_kill = enemies_to_kill if enemies_to_kill is not None else random.randint(25, 45)
+        # Nombre d'ennemis choisi aléatoirement entre 40 et 60 (le boss compte comme 1 ennemi)
+        self.enemies_to_kill = enemies_to_kill if enemies_to_kill is not None else random.randint(20, 40)
         self.boss_counted = False  # Pour s'assurer que le boss n'est compté qu'une fois
         
         # Boss
@@ -218,8 +218,8 @@ class BattleMission:
         self.screen_black = False  # Écran noir
         self.final_explosion_time = None  # Moment de l'explosion finale
         self.ship_explosion_list = arcade.SpriteList()  # Explosions sur le vaisseau
-        self.boss_health = 40
-        self.boss_max_health = 40
+        self.boss_health = 100
+        self.boss_max_health = 100
         self.boss_bullet_list = None
         self.last_boss_shot = 0
         # Résultat
@@ -264,8 +264,8 @@ class BattleMission:
         # Réinitialiser boss
         self.boss_active = False
         self.boss_sprite = None
-        self.boss_health = 40
-        self.boss_max_health = 40
+        self.boss_health = 150
+        self.boss_max_health = 150
         self.last_boss_shot = 0
         self.success = False
         self.laser_sound = arcade.load_sound("assets/sounds/laser.wav")
@@ -484,7 +484,7 @@ class BattleMission:
             for bullet in list(self.bullet_list):
                 if arcade.check_for_collision(bullet, self.boss_sprite):
                     bullet.remove_from_sprite_lists()
-                    self.boss_health -= 2
+                    self.boss_health -= 5
                     impact = TextureExplosion(bullet.center_x, bullet.center_y, 'Circle_explosion3.png')
                     self.explosion_list.append(impact)
                     if self.boss_health <= 0:
@@ -521,7 +521,7 @@ class BattleMission:
                 self.explosion_list.append(explosion)
                 enemy.remove_from_sprite_lists()
                 # Appliquer des dégâts au héros
-                damage = 5
+                damage = 3
                 self.hero.health = max(0, self.hero.health - damage)
                 # Mettre à jour l'état du héros
                 if self.hero.health <= 0:
@@ -560,7 +560,7 @@ class BattleMission:
         for boss_bullet in list(self.boss_bullet_list):
             if arcade.check_for_collision(boss_bullet, self.player_sprite):
                 boss_bullet.remove_from_sprite_lists()
-                damage = 40
+                damage = 10
                 self.hero.health = max(0, self.hero.health - damage)
                 if self.hero.health <= 0:
                     # Déclencher l'effet de défaite du héros (même logique que les autres)

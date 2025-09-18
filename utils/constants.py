@@ -21,7 +21,7 @@ SURVEILLANCE_SCREEN_Y = 200
 
 # Paramètres des missions
 MISSION_DURATION = 60  # secondes
-HERO_HEALTH_MAX = 100
+HERO_HEALTH_MAX = 200  # Augmenté pour des batailles plus longues
 HERO_STAMINA_MAX = 100
 
 # Couleurs

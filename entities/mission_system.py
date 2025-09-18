@@ -211,6 +211,11 @@ class MissionSystem:
     def complete_mission(self, ship=None):
         if self.current_mission:
             print(f"Mission '{self.current_mission['name']}' réussie!")
+            
+            # Calculer le résultat du pari si un pari a été placé
+            if self.bet_placed and not self.bet_result:
+                self.calculate_bet_result()
+            
             # Incrémenter le nombre de missions réussies
             try:
                 self.missions_completed_success_count += 1
@@ -228,6 +233,11 @@ class MissionSystem:
     def fail_mission(self, ship=None):
         if self.current_mission:
             print(f"Mission '{self.current_mission['name']}' échouée!")
+            
+            # Calculer le résultat du pari si un pari a été placé
+            if self.bet_placed and not self.bet_result:
+                self.calculate_bet_result()
+            
             self.current_mission = None
             self.travel_end_time = None
             # Réinitialiser le timer de pari
@@ -240,6 +250,11 @@ class MissionSystem:
     def timeout_mission(self, ship=None):
         if self.current_mission:
             print(f"Mission '{self.current_mission['name']}' expirée!")
+            
+            # Calculer le résultat du pari si un pari a été placé
+            if self.bet_placed and not self.bet_result:
+                self.calculate_bet_result()
+            
             self.current_mission = None
             self.travel_end_time = None
             # Faire réapparaître le héros
@@ -378,11 +393,14 @@ class MissionSystem:
         if not self.bet_placed:
             return None
         
-        # Déterminer si la MISSION DE BATAILLE (mission principale du héros) a réussi
-        # C'est sur cette mission qu'on parie
+        # Déterminer si la mission a réussi
         mission_success = False
         
-        if self.hero and self.hero.battle_mission:
+        # Pour les missions d'exploration (première mission), elle est toujours gagnée
+        if self.hero and hasattr(self.hero, 'explore_mission') and self.hero.explore_mission:
+            # La mission d'exploration est truquée pour toujours réussir
+            mission_success = True
+        elif self.hero and hasattr(self.hero, 'battle_mission') and self.hero.battle_mission:
             # La mission de bataille est réussie si elle est marquée comme complétée avec succès
             mission_success = (self.hero.battle_mission.mission_completed and 
                              self.hero.battle_mission.success)

@@ -60,7 +60,7 @@ class ExploreMission:
         self.last_shot_time = 0
         self.last_enemy_shot = 0  # Pour les tirs d'ennemis
         self.start_time = time.time()
-        self.max_duration_seconds = 10.0
+        self.max_duration_seconds = 60.0
         self.duration_expired = False
         self.force_artifact_next = False
         self.min_health_threshold = 2  # Truquage: ne jamais descendre en-dessous

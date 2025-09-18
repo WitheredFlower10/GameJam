@@ -251,9 +251,9 @@ class Ship(arcade.SpriteList):
                 is_traveling = bool(getattr(mission_system, 'travel_end_time', None)) if mission_system else False
                 if (mission_system and (mission_system.current_mission or is_traveling)) or (not self.hero_npc or not self.hero_npc.visible):
                     continue
-            # Cacher l'icône de pari si aucune mission n'est en cours
+            # Cacher l'icône de pari si aucune mission n'est en cours ou si un pari est déjà placé
             if point.get('type') == 'betting_station':
-                if not (mission_system and mission_system.current_mission):
+                if not (mission_system and mission_system.current_mission) or mission_system.bet_placed:
                     continue
             # Cacher la réparation ENNEMIS tant que la première mission n'est pas réussie
             if point.get('type') == 'repair_screen_enemies':
