@@ -383,7 +383,7 @@ class ExploreMission:
             self.bullet_list.append(bullet)
             self.last_shot_time = time.time()
             if self.laser_sound:
-                arcade.play_sound(self.laser_sound, volume=0.06)
+                arcade.play_sound(self.laser_sound, volume=0.1)
 
         # Tir des ennemis statiques
         if time.time() - self.last_enemy_shot > 2.0:  # Tir toutes les 2 secondes
