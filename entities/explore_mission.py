@@ -71,7 +71,7 @@ class ExploreMission:
         self.evaluated_platforms = set()  # Plateformes déjà évaluées pour le saut
         self.min_enemy_spacing = 30
         self.last_random_jump_time = 0  # Temps du dernier saut aléatoire
-
+        self.laser_sound = arcade.load_sound("assets/sounds/laser.wav")
         self.start_mission()
     
     def _get_hero_dimensions(self):
@@ -382,6 +382,8 @@ class ExploreMission:
             bullet.change_x = BULLET_SPEED
             self.bullet_list.append(bullet)
             self.last_shot_time = time.time()
+            if self.laser_sound:
+                arcade.play_sound(self.laser_sound, volume=0.1)
 
         # Tir des ennemis statiques
         if time.time() - self.last_enemy_shot > 2.0:  # Tir toutes les 2 secondes
