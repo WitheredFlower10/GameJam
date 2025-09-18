@@ -124,6 +124,15 @@ class Ship(arcade.SpriteList):
             'description': 'Réparer l\'écran de surveillance pour la vie'
         })
         
+        # repair 3 (général)
+        self.interaction_points.append({
+            'x': 1500,
+            'y': 350,
+            'type': 'repair_general',
+            'name': 'REPARATION GÉNÉRALE',
+            'description': 'Réparer les systèmes généraux du vaisseau'
+        })
+        
         # Station de paris
         self.interaction_points.append({
             'x':2570,

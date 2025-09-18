@@ -45,6 +45,10 @@ class MissionSystem:
         # Mini-jeu de réparation (réacteur/écran)
         self.repair_requested = False
         self.repair_completed = False
+        
+        # Mini-jeu de réparation générale
+        self.general_repair_requested = False
+        self.general_repair_completed = False
 
         # Mini-jeu scanner ennemis (débloque compteur ennemis)
         self.enemies_screen_requested = False
@@ -215,6 +219,9 @@ class MissionSystem:
             # Calculer le résultat du pari si un pari a été placé
             if self.bet_placed and not self.bet_result:
                 self.calculate_bet_result()
+                # Pour la mission d'exploration, terminer la mission dès que le pari est calculé
+                if self.hero and hasattr(self.hero, 'explore_mission') and self.hero.explore_mission:
+                    self.hero.explore_mission.end_mission()
             
             # Incrémenter le nombre de missions réussies
             try:
@@ -237,6 +244,9 @@ class MissionSystem:
             # Calculer le résultat du pari si un pari a été placé
             if self.bet_placed and not self.bet_result:
                 self.calculate_bet_result()
+                # Pour la mission d'exploration, terminer la mission dès que le pari est calculé
+                if self.hero and hasattr(self.hero, 'explore_mission') and self.hero.explore_mission:
+                    self.hero.explore_mission.end_mission()
             
             self.current_mission = None
             self.travel_end_time = None
@@ -254,6 +264,9 @@ class MissionSystem:
             # Calculer le résultat du pari si un pari a été placé
             if self.bet_placed and not self.bet_result:
                 self.calculate_bet_result()
+                # Pour la mission d'exploration, terminer la mission dès que le pari est calculé
+                if self.hero and hasattr(self.hero, 'explore_mission') and self.hero.explore_mission:
+                    self.hero.explore_mission.end_mission()
             
             self.current_mission = None
             self.travel_end_time = None
@@ -328,6 +341,12 @@ class MissionSystem:
                 return "Réparation Scanner déjà effectuée."
             self.enemies_screen_requested = True
             return "Réparation Scanner lancée !"
+        elif point_name == "REPARATION GÉNÉRALE":
+            # Lancer le mini-jeu de réparation générale
+            if self.general_repair_completed:
+                return "Réparation générale déjà effectuée."
+            self.general_repair_requested = True
+            return "Réparation générale lancée !"
         elif point_name == "PARIER":
             if not self.current_mission:
                 return "Aucune mission active pour parier."
@@ -363,6 +382,8 @@ class MissionSystem:
             return bool(self.wire_puzzle_completed)
         if name == "REPARATION / ENNEMIS":
             return bool(self.enemies_screen_completed)
+        if name == "REPARATION GÉNÉRALE":
+            return bool(self.general_repair_completed)
         # Par défaut: non complété (affichage autorisé)
         return False
     

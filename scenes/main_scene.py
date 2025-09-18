@@ -311,6 +311,8 @@ class MainScene(arcade.View):
         # Dessiner les mini-jeux de réparation/scanner
         if hasattr(self, 'repair_overlay') and self.repair_overlay is not None:
             self.repair_overlay.on_draw()
+        if hasattr(self, 'general_repair_overlay') and self.general_repair_overlay is not None:
+            self.general_repair_overlay.on_draw()
         if hasattr(self, 'enemy_scan_overlay') and self.enemy_scan_overlay is not None:
             self.enemy_scan_overlay.on_draw()
 
@@ -857,6 +859,13 @@ class MainScene(arcade.View):
                 def _on_repair_complete():
                     self.repair_overlay = None
                 self.repair_overlay = RepairMinigameOverlay(self.window, on_exit_callback=_on_repair_complete, mission_system=self.mission_system, completion_attr="repair_completed", title="RÉPARATION ÉCRAN - SYSTÈME DE SANTÉ")
+            
+            # Lancer le mini-jeu de réparation GÉNÉRALE si demandé (overlay)
+            if getattr(self.mission_system, 'general_repair_requested', False):
+                self.mission_system.general_repair_requested = False
+                def _on_general_repair_complete():
+                    self.general_repair_overlay = None
+                self.general_repair_overlay = RepairMinigameOverlay(self.window, on_exit_callback=_on_general_repair_complete, mission_system=self.mission_system, completion_attr="general_repair_completed", title="RÉPARATION GÉNÉRALE - SYSTÈMES DU VAISSEAU")
 
             # Lancer le mini-jeu de réparation SCANNER ENNEMIS si demandé (overlay)
             if getattr(self.mission_system, 'enemies_screen_requested', False):
@@ -933,6 +942,9 @@ class MainScene(arcade.View):
             return
         if hasattr(self, 'repair_overlay') and self.repair_overlay is not None:
             self.repair_overlay.on_key_press(key, modifiers)
+            return
+        if hasattr(self, 'general_repair_overlay') and self.general_repair_overlay is not None:
+            self.general_repair_overlay.on_key_press(key, modifiers)
             return
         if hasattr(self, 'enemy_scan_overlay') and self.enemy_scan_overlay is not None:
             self.enemy_scan_overlay.on_key_press(key, modifiers)
