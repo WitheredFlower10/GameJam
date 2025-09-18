@@ -109,7 +109,7 @@ class Ship(arcade.SpriteList):
         # repair 1 (ennemis)
         self.interaction_points.append({
             'x': 1920,
-            'y': 435,
+            'y': 330,
             'type': 'repair_screen_enemies',
             'name': 'REPARATION / ENNEMIS',
             'description': 'Réparer l\'écran de surveillance pour les ennemis'
@@ -118,7 +118,7 @@ class Ship(arcade.SpriteList):
         # repair 2 (vie)
         self.interaction_points.append({
             'x': 820,
-            'y': 465,
+            'y': 360,
             'type': 'repair_screen_health',
             'name': 'REPARATION / VIE',
             'description': 'Réparer l\'écran de surveillance pour la vie'
@@ -127,7 +127,7 @@ class Ship(arcade.SpriteList):
         # Station de paris
         self.interaction_points.append({
             'x':2570,
-            'y': 435,
+            'y': 330,
             'type': 'betting_station',
             'name': 'PARIER',
             'description': 'Parier sur la réussite du héros'
@@ -137,7 +137,7 @@ class Ship(arcade.SpriteList):
         # Activer le Terminal (inchangé)
         self.interaction_points.append({
             'x': 2220,
-            'y': 430,
+            'y': 320,
             'type': 'terminal',
             'name': 'TERMINAL',
             'description': 'Accéder au terminal de communication'
