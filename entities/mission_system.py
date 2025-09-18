@@ -26,6 +26,11 @@ class MissionSystem:
         # État temporaire pour l'UI de pari
         self.temp_bet_type = None
         self.temp_bet_amount = 100
+        
+        # Timer de pari forcé
+        self.betting_timer = None  # Temps de fin du timer
+        self.betting_timer_duration = 5.0  # 30 secondes
+        self.betting_forced = False  # Flag pour indiquer si le pari est forcé
 
         # Ordonnancement des missions
         self.missions_assigned_count = 0
@@ -133,6 +138,11 @@ class MissionSystem:
             self.missions_assigned_count += 1
             self.missions_launched_count += 1  # Incrémenter le compteur de missions lancées
             
+            # Démarrer le timer de pari forcé
+            self.betting_timer = time.time() + self.betting_timer_duration
+            self.betting_forced = False
+            print(f"Timer de pari démarré: {self.betting_timer_duration} secondes")
+            
             print(f"Mission '{self.current_mission['name']}' assignée au héros!")
     
     def update(self, delta_time, ship=None):
@@ -161,9 +171,27 @@ class MissionSystem:
             self.gold += 100
             self.missions_assigned_count += 1
             self.missions_launched_count += 1  # Incrémenter le compteur de missions lancées
+            
+            # Démarrer le timer de pari forcé
+            self.betting_timer = time.time() + self.betting_timer_duration
+            self.betting_forced = False
+            print(f"Timer de pari démarré: {self.betting_timer_duration} secondes")
+            
             print(f"Mission '{self.current_mission['name']}' assignée au héros après le trajet!")
         
         if self.current_mission:
+            # Vérifier le timer de pari forcé
+            if (self.betting_timer is not None and 
+                time.time() >= self.betting_timer and 
+                not self.betting_forced and 
+                not self.bet_placed):
+                # Forcer l'ouverture du système de pari
+                self.betting_forced = True
+                self.betting_active = True
+                self.temp_bet_type = None
+                self.temp_bet_amount = min(100, max(10, self.gold)) if self.gold > 0 else 0
+                print("Timer de pari expiré - Système de pari forcé ouvert!")
+            
             # Mettre à jour la progression de la mission
             if self.hero:
                 self.current_mission['progress'] = self.hero.get_progress_percentage()
@@ -190,6 +218,9 @@ class MissionSystem:
                 self.missions_completed_success_count = 1
             self.current_mission = None
             self.travel_end_time = None
+            # Réinitialiser le timer de pari
+            self.betting_timer = None
+            self.betting_forced = False
             # Faire réapparaître le héros
             if ship:
                 ship.set_hero_on_mission(False)
@@ -199,6 +230,9 @@ class MissionSystem:
             print(f"Mission '{self.current_mission['name']}' échouée!")
             self.current_mission = None
             self.travel_end_time = None
+            # Réinitialiser le timer de pari
+            self.betting_timer = None
+            self.betting_forced = False
             # Faire réapparaître le héros
             if ship:
                 ship.set_hero_on_mission(False)
@@ -336,6 +370,7 @@ class MissionSystem:
         # Débiter immédiatement les fonds pariés
         self.gold -= amount
         
+        
         return f"Pari de {amount} crédits placé sur {bet_type} !"
     
     def calculate_bet_result(self):
@@ -348,15 +383,12 @@ class MissionSystem:
         mission_success = False
         
         if self.hero and self.hero.battle_mission:
-            # La mission de bataille est réussie si des ennemis ont été détruits
-            mission_success = self.hero.battle_mission.enemies_destroyed > 0
-            print(f"Debug - Mission de bataille du héros:")
-            print(f"Debug - Ennemis détruits: {self.hero.battle_mission.enemies_destroyed}")
-            print(f"Debug - Mission de bataille réussie: {mission_success}")
+            # La mission de bataille est réussie si elle est marquée comme complétée avec succès
+            mission_success = (self.hero.battle_mission.mission_completed and 
+                             self.hero.battle_mission.success)
         else:
             # Fallback pour d'autres types de missions
             mission_success = self.hero.is_mission_complete() if self.hero else False
-            print(f"Debug - Mission réussie (autre type): {mission_success}")
         
         # Créer un résultat détaillé
         self.bet_result = {
@@ -373,29 +405,35 @@ class MissionSystem:
             # Pari gagné sur la réussite de la MISSION DE BATAILLE
             self.bet_result['won'] = True
             self.bet_result['winnings'] = self.bet_amount * 2
-            self.bet_result['message'] = f"🎉 PARI GAGNÉ ! 🎉\nVous aviez parié sur la RÉUSSITE\nMission de bataille du héros: RÉUSSIE ✅\nGains: +{self.bet_result['winnings']} crédits"
-            # Créditer l'or (double du montant misé)
             self.gold += self.bet_result['winnings']
         elif self.bet_type == "echec" and not mission_success:
             # Pari gagné sur l'échec de la MISSION DE BATAILLE
             self.bet_result['won'] = True
             self.bet_result['winnings'] = self.bet_amount * 2
-            self.bet_result['message'] = f"🎉 PARI GAGNÉ ! 🎉\nVous aviez parié sur l'ÉCHEC\nMission de bataille du héros: ÉCHOUÉE ❌\nGains: +{self.bet_result['winnings']} crédits"
-            # Créditer l'or (double du montant misé)
             self.gold += self.bet_result['winnings']
         else:
             # Pari perdu
             self.bet_result['won'] = False
             self.bet_result['winnings'] = -self.bet_amount
-            if self.bet_type == "success":
-                self.bet_result['message'] = f"💸 PARI PERDU 💸\nVous aviez parié sur la RÉUSSITE\nMission de bataille du héros: ÉCHOUÉE ❌\nPertes: -{self.bet_amount} crédits"
-            else:
-                self.bet_result['message'] = f"💸 PARI PERDU 💸\nVous aviez parié sur l'ÉCHEC\nMission de bataille du héros: RÉUSSIE ✅\nPertes: -{self.bet_amount} crédits"
+        
+        # Créer le message de résultat
+        if self.bet_result['won']:
+            self.bet_result['message'] = f"🎉 PARI GAGNÉ ! 🎉\nVous avez parié {self.bet_amount} crédits sur {self.bet_type}\nMission {'réussie' if mission_success else 'échouée'}\nGains: +{self.bet_result['winnings']} crédits"
+        else:
+            self.bet_result['message'] = f"❌ PARI PERDU ❌\nVous avez parié {self.bet_amount} crédits sur {self.bet_type}\nMission {'réussie' if mission_success else 'échouée'}\nPerte: {self.bet_result['winnings']} crédits"
         
         return self.bet_result
     
     def close_betting_interface(self):
         self.betting_active = False
+    
+    def get_betting_timer_remaining(self):
+        """Retourne le temps restant avant le pari forcé en secondes"""
+        if self.betting_timer is None:
+            return 0
+        remaining = self.betting_timer - time.time()
+        result = max(0, int(remaining))
+        return result
     
     def get_betting_info(self):
         if not self.betting_active:

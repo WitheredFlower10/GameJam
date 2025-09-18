@@ -334,6 +334,19 @@ class MainScene(arcade.View):
         # Crédits (encore plus haut, aligné avec les titres)
         x_left = 10
         y_cursor = self.ui_height - 6
+        
+        # Afficher le timer de pari si une mission est active
+        if self.mission_system.current_mission and not self.mission_system.betting_forced:
+            timer_remaining = self.mission_system.get_betting_timer_remaining()
+            if timer_remaining > 0:
+                timer_color = arcade.color.YELLOW if timer_remaining > 10 else arcade.color.RED
+                arcade.draw_text(f"Pari dans: {timer_remaining}s", x_left, y_cursor, timer_color, 16, bold=True)
+                y_cursor -= 22
+            else:
+                # Debug: afficher si le timer est à 0
+                arcade.draw_text("Timer: 0s", x_left, y_cursor, arcade.color.RED, 16, bold=True)
+                y_cursor -= 22
+        
         arcade.draw_text(f"Crédits: {self.mission_system.gold}", x_left, y_cursor, arcade.color.GOLD, 18, bold=True)
         y_cursor -= 26
 
@@ -395,22 +408,14 @@ class MainScene(arcade.View):
         # Contrôles
         arcade.draw_text("FLÈCHES: Se déplacer | ESPACE: Interagir", 
                         10, 30, arcade.color.WHITE, 14)
-        
-        # Information sur la mission de bataille
-        if (self.hero and self.hero.battle_mission and 
-            self.hero.battle_mission.is_active):
-            arcade.draw_text("MISSION DE BATAILLE EN COURS", 
-                            10, 50, arcade.color.YELLOW, 14)
-        
+
         # Interface de paris
         if self.mission_system.betting_active:
             self.draw_betting_interface()
         
         # Résultat de pari
         if self.mission_system.bet_result:
-            arcade.draw_text(self.mission_system.bet_result, 
-                            self.ui_width // 2, 100, arcade.color.GOLD, 18,
-                            anchor_x="center")
+            self.draw_bet_result()
         
         # Bouton retour au menu
         arcade.draw_text("ÉCHAP: Retour au menu", 
@@ -624,20 +629,6 @@ class MainScene(arcade.View):
             SCREEN_WIDTH // 2, SCREEN_HEIGHT - 150,
             arcade.color.WHITE, 20, anchor_x="center"
         )
-
-        # Statistiques du héros
-        arcade.draw_text(
-            f"Progression: {betting_info['mission_progress']:.1f}%",
-            SCREEN_WIDTH // 2, SCREEN_HEIGHT - 180,
-            arcade.color.LIGHT_BLUE, 16, anchor_x="center"
-        )
-
-        arcade.draw_text(
-            f"Vie: {betting_info['hero_health']:.1f}%",
-            SCREEN_WIDTH // 2, SCREEN_HEIGHT - 200,
-            arcade.color.GREEN, 16, anchor_x="center"
-        )
-
         # Options de pari
         arcade.draw_text(
             "Sur quoi voulez-vous parier ?",
@@ -696,7 +687,7 @@ class MainScene(arcade.View):
             border_color = arcade.color.LIGHT_GREEN
         else:
             title_color = arcade.color.RED
-            border_color = arcade.color.LIGHT_RED
+            border_color = arcade.color.RED
         
         # Titre principal
         arcade.draw_text(
@@ -714,22 +705,29 @@ class MainScene(arcade.View):
         
         # Message détaillé (ligne par ligne)
         message_lines = bet_result['message'].split('\n')
-        start_y = SCREEN_HEIGHT // 2 + 100
+        start_y = SCREEN_HEIGHT // 2 + 80
         
         for i, line in enumerate(message_lines):
-            color = title_color if i == 0 else arcade.color.WHITE
-            size = 24 if i == 0 else 18
+            if i == 0:  # Titre principal (🎉 PARI GAGNÉ ! 🎉 ou ❌ PARI PERDU ❌)
+                color = title_color
+                size = 28
+            elif "Gains:" in line or "Perte:" in line:  # Ligne des gains/pertes
+                color = arcade.color.GOLD if bet_result['won'] else arcade.color.RED
+                size = 20
+            else:  # Autres lignes
+                color = arcade.color.WHITE
+                size = 16
             
             arcade.draw_text(
                 line,
-                SCREEN_WIDTH // 2, start_y - (i * 40),
-                color, size, anchor_x="center"
+                SCREEN_WIDTH // 2, start_y - (i * 35),
+                color, size, anchor_x="center", bold=(i == 0 or "Gains:" in line or "Perte:" in line)
             )
         
         # Informations supplémentaires
         arcade.draw_text(
-            f"Montant du pari: {bet_result['bet_amount']} crédits",
-            SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 50,
+            f"Crédits actuels: {self.mission_system.gold}",
+            SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 80,
             arcade.color.LIGHT_GRAY, 16, anchor_x="center"
         )
         
@@ -778,7 +776,7 @@ class MainScene(arcade.View):
         elif key == arcade.key.KEY_2:
             self.betting_input_mode = 'echec'
             self.betting_input_amount = ''
-            self.show_floating_message("Entrez le montant à parier (Échec)", arcade.color.LIGHT_RED)
+            self.show_floating_message("Entrez le montant à parier (Échec)", arcade.color.RED)
         elif key == arcade.key.KEY_3:
             self.mission_system.close_betting_interface()
             self.show_floating_message("Pari annulé.", arcade.color.LIGHT_GRAY)
