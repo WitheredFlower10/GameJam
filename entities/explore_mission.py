@@ -131,7 +131,7 @@ class ExploreMission:
         self.original_hero_scale = getattr(self.hero, 'scale', 1.0)
 
         # Réduire la taille du héros pour cette mission seulement
-        self.hero.scale = 0.5  # Diviser la taille par 2
+        self.hero.scale = 0.25  # Diviser la taille par 4 (2 fois plus petit que précédemment)
 
         # Positionner le héros au sol côté gauche (niveau 0) - pieds sur le sol
         self.hero.center_x = self.overlay_x + 20
@@ -784,5 +784,3 @@ class ExploreMission:
         horizontal_ok = (hero_right >= art_left - margin_x) and (hero_left <= art_right + margin_x)
         vertical_ok = (hero_bottom <= art_top + margin_y)
         return horizontal_ok and vertical_ok
-
-

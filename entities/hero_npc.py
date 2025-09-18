@@ -20,15 +20,21 @@ class HeroNPC(arcade.Sprite):
         self.visible = True  # Contrôle la visibilité
         self.is_on_mission = False
         
-        # Charger une texture simple du héros
-        self.load_hero_texture()
+        # Animation de respiration
+        self.breathing_textures = []
+        self.animation_index = 0
+        self.animation_timer = 0.0
+        self.animation_speed = 0.6  # secondes par frame
+        
+        # Charger les textures du héros
+        self.load_hero_textures()
         
         # Point d'interaction au-dessus de la tête
         self.interaction_offset_y = 40  # Pixels au-dessus de la tête
         
-    def load_hero_texture(self):
-        """Charge la première texture du héros pour un affichage statique"""
-        # Chercher la première texture hero-walk-frame-0.png
+    def load_hero_textures(self):
+        """Charge les textures du héros pour un affichage animé"""
+        # Chercher les textures de respiration du héros
         base_candidates = [
             'assets',
             os.path.join(os.path.dirname(__file__), '..', 'assets'),
@@ -36,26 +42,34 @@ class HeroNPC(arcade.Sprite):
         base_candidates = [os.path.normpath(p) for p in base_candidates]
         
         for base in base_candidates:
-            walk_dir = os.path.join(base, 'walk')
-            if os.path.isdir(walk_dir):
-                hero_texture_path = os.path.join(walk_dir, 'hero-walk-frame-0.png')
-                if os.path.exists(hero_texture_path):
-                    try:
-                        self.texture = arcade.load_texture(hero_texture_path)
-                        print(f"Texture héros chargée: {hero_texture_path}")
-                        return
-                    except Exception as e:
-                        print(f"Erreur chargement texture {hero_texture_path}: {e}")
+            breathing_dir = os.path.join(base, 'breathing', 'hero')
+            if os.path.isdir(breathing_dir):
+                for i in range(2):  # Charger les frames 0 et 1
+                    hero_texture_path = os.path.join(breathing_dir, f'breath-frame-{i}.png')
+                    if os.path.exists(hero_texture_path):
+                        try:
+                            self.breathing_textures.append(arcade.load_texture(hero_texture_path))
+                            print(f"Texture respiration héros chargée: {hero_texture_path}")
+                        except Exception as e:
+                            print(f"Erreur chargement texture {hero_texture_path}: {e}")
         
         # Fallback - carré coloré bleu
-        self.texture = arcade.make_soft_square_texture(32, (0, 150, 255), outer_alpha=255)
-        print("Aucune texture hero-walk-frame-0.png trouvée, utilisation du fallback bleu")
+        if not self.breathing_textures:
+            self.breathing_textures.append(arcade.make_soft_square_texture(32, (0, 150, 255), outer_alpha=255))
+            print("Aucune texture breath-frame-*.png trouvée, utilisation du fallback bleu")
+        
+        # Définir la première texture comme texture actuelle
+        self.texture = self.breathing_textures[0]
     
     
     def update(self, delta_time):
-        """Mise à jour simple - juste la gestion de visibilité"""
+        """Mise à jour simple - juste la gestion de visibilité et l'animation de respiration"""
         # Pas d'animation, juste la gestion de visibilité
-        pass
+        self.animation_timer += delta_time
+        if self.animation_timer >= self.animation_speed:
+            self.animation_timer = 0.0
+            self.animation_index = (self.animation_index + 1) % len(self.breathing_textures)
+            self.texture = self.breathing_textures[self.animation_index]
     
     def get_interaction_point(self):
         """Retourne les coordonnées du point d'interaction au-dessus de la tête"""
