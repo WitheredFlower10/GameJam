@@ -543,34 +543,57 @@ class MainScene(arcade.View):
         betting_info = self.mission_system.get_betting_info()
         if not betting_info:
             return
-        
+
         # Fond semi-transparent
         arcade.draw_lrbt_rectangle_filled(
             0, self.ui_width, 0, self.ui_height,
             (0, 0, 0, 150)
         )
-        
+
+        if hasattr(self, 'betting_input_mode') and self.betting_input_mode:
+            box_w = 420
+            box_h = 70
+            box_x = (self.ui_width - box_w) // 2
+            box_y = self.ui_height - 60
+            arcade.draw_lrbt_rectangle_filled(
+                box_x, box_x + box_w, box_y, box_y + box_h,
+                (30, 30, 30, 230)
+            )
+            arcade.draw_lrbt_rectangle_outline(
+                box_x, box_x + box_w, box_y, box_y + box_h,
+                arcade.color.GOLD, 2
+            )
+            if self.betting_input_mode == 'success':
+                label = "Montant à parier sur la RÉUSSITE :"
+                color = arcade.color.LIGHT_GREEN
+            else:
+                label = "Montant à parier sur l'ÉCHEC :"
+                color = arcade.color.LIGHT_GREEN
+            arcade.draw_text(label, self.ui_width // 2, box_y + box_h - 28, color, 18, anchor_x="center", bold=True)
+            amount_str = getattr(self, 'betting_input_amount', '')
+            arcade.draw_text(f"{amount_str}", self.ui_width // 2, box_y + 18, arcade.color.WHITE, 28, anchor_x="center", bold=True)
+
         # Titre
         arcade.draw_text(
             "STATION DE PARIS",
             self.ui_width // 2, self.ui_height - 100,
             arcade.color.GOLD, 32, anchor_x="center", bold=True
         )
-        
+
         # Informations de la mission
         arcade.draw_text(
             f"Mission: {betting_info['mission_name']}",
             SCREEN_WIDTH // 2, SCREEN_HEIGHT - 150,
             arcade.color.WHITE, 20, anchor_x="center"
         )
-        
+
         # Statistiques du héros
         arcade.draw_text(
             f"Progression: {betting_info['mission_progress']:.1f}%",
             SCREEN_WIDTH // 2, SCREEN_HEIGHT - 180,
             arcade.color.LIGHT_BLUE, 16, anchor_x="center"
         )
-        
+
         arcade.draw_text(
             f"Vie: {betting_info['hero_health']:.1f}%",
             SCREEN_WIDTH // 2, SCREEN_HEIGHT - 200,
@@ -583,32 +606,39 @@ class MainScene(arcade.View):
             SCREEN_WIDTH // 2, SCREEN_HEIGHT - 280,
             arcade.color.WHITE, 18, anchor_x="center"
         )
-        
+
         # Boutons de pari
         arcade.draw_text(
             "1 - RÉUSSITE de la mission (x2 gains)",
             SCREEN_WIDTH // 2, SCREEN_HEIGHT - 320,
             arcade.color.GREEN, 16, anchor_x="center"
         )
-        
+
         arcade.draw_text(
             "2 - ÉCHEC de la mission (x2 gains)",
             SCREEN_WIDTH // 2, SCREEN_HEIGHT - 350,
             arcade.color.RED, 16, anchor_x="center"
         )
-        
+
         arcade.draw_text(
             "3 - Annuler",
             SCREEN_WIDTH // 2, SCREEN_HEIGHT - 380,
             arcade.color.GRAY, 16, anchor_x="center"
         )
-        
+
         # Instructions
-        arcade.draw_text(
-            "Appuyez sur 1, 2 ou 3 pour choisir",
-            SCREEN_WIDTH // 2, 100,
-            arcade.color.LIGHT_GRAY, 14, anchor_x="center"
-        )
+        if hasattr(self, 'betting_input_mode') and self.betting_input_mode:
+            arcade.draw_text(
+                "Entrez le montant puis appuyez sur Entrée (ESC pour annuler)",
+                self.ui_width // 2, self.ui_height - 120,
+                arcade.color.LIGHT_GRAY, 15, anchor_x="center"
+            )
+        else:
+            arcade.draw_text(
+                "Appuyez sur 1, 2 ou 3 pour choisir",
+                SCREEN_WIDTH // 2, 100,
+                arcade.color.LIGHT_GRAY, 14, anchor_x="center"
+            )
     
     def draw_bet_result(self):
         # Afficher le résultat détaillé du pari
@@ -673,19 +703,47 @@ class MainScene(arcade.View):
         )
     
     def handle_betting_input(self, key):
-        # Gérer les entrées pour l'interface de paris
+        if not hasattr(self, 'betting_input_mode'):
+            self.betting_input_mode = None  # None, 'success', 'echec'
+            self.betting_input_amount = ''
+        if self.betting_input_mode:
+            if arcade.key.KEY_0 <= key <= arcade.key.KEY_9:
+                if len(self.betting_input_amount) < 7:
+                    self.betting_input_amount += chr(key)
+            elif key == arcade.key.BACKSPACE:
+                self.betting_input_amount = self.betting_input_amount[:-1]
+            elif key in (arcade.key.ENTER, arcade.key.RETURN):
+                try:
+                    amount = int(self.betting_input_amount)
+                except Exception:
+                    amount = 0
+                if amount <= 0:
+                    self.show_floating_message("Montant invalide !", arcade.color.RED)
+                elif amount > self.mission_system.gold:
+                    self.show_floating_message("Fonds insuffisants !", arcade.color.RED)
+                else:
+                    result = self.mission_system.place_bet(self.betting_input_mode, amount)
+                    self.show_floating_message(str(result), arcade.color.GREEN if "placé" in str(result) else arcade.color.RED)
+                    print(result)
+                    self.betting_input_mode = None
+                    self.betting_input_amount = ''
+                    return
+                self.betting_input_amount = ''
+            elif key == arcade.key.ESCAPE:
+                self.betting_input_mode = None
+                self.betting_input_amount = ''
+            return
         if key == arcade.key.KEY_1:
-            # Parier sur la réussite
-            result = self.mission_system.place_bet("success", 100)  # 100 crédits par défaut
-            print(result)
+            self.betting_input_mode = 'success'
+            self.betting_input_amount = ''
+            self.show_floating_message("Entrez le montant à parier (Succès)", arcade.color.LIGHT_GREEN)
         elif key == arcade.key.KEY_2:
-            # Parier sur l'échec
-            result = self.mission_system.place_bet("failure", 100)  # 100 crédits par défaut
-            print(result)
+            self.betting_input_mode = 'echec'
+            self.betting_input_amount = ''
+            self.show_floating_message("Entrez le montant à parier (Échec)", arcade.color.LIGHT_RED)
         elif key == arcade.key.KEY_3:
-            # Annuler
             self.mission_system.close_betting_interface()
-            print("Pari annulé.")
+            self.show_floating_message("Pari annulé.", arcade.color.LIGHT_GRAY)
     
     def on_update(self, delta_time):
         if self.game_state == GAME_STATE_PLAYING:
