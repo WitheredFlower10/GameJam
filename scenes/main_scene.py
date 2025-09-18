@@ -70,6 +70,11 @@ class MainScene(arcade.View):
 
         # Terminal principal
         self.terminal = None
+        #Son
+        self.sound_back = None
+        self.sound_enabled = True
+        self.background_music_player = None
+        self.music_should_loop = True  # Flag pour contrôler la boucle
 
        
 
@@ -117,6 +122,8 @@ class MainScene(arcade.View):
         self.agent_list = arcade.SpriteList()
         self.hero_list = arcade.SpriteList()
         self.collision_list = arcade.SpriteList()
+        self.sound_back = arcade.load_sound("assets/sounds/interstellar.wav")
+        self.start_background_music()
         
         # Initialiser les entités
         self.agent = Agent()
@@ -181,7 +188,15 @@ class MainScene(arcade.View):
 
 
 
-        
+    def start_background_music(self):
+        """Démarrer la musique de fond"""
+        if self.sound_enabled and self.background_music_player is None:
+            try:
+                self.background_music_player = self.sound_back.play(loop=self.music_should_loop, volume=0.1)
+                print("Musique de fond démarrée")
+            except Exception as e:
+                print(f"Erreur lecture musique: {e}")
+
         # Ne pas démarrer de mission automatiquement
         # La mission sera assignée via les interactions
     
@@ -929,7 +944,7 @@ class MainScene(arcade.View):
             self.terminal.on_key_press(key, modifiers)
             return
         if key == arcade.key.ESCAPE:
-            
+            self.background_music_player.delete()
             # Retour au menu
             from scenes.menu_scene import MenuScene
             menu_scene = MenuScene()
