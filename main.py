@@ -1,5 +1,7 @@
 import arcade
 import platform
+from scenes.game_end_scene import GameEndScene
+from scenes.game_over_scene import GameOverScene
 from scenes.menu_scene import MenuScene
 from utils.constants import SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE
 

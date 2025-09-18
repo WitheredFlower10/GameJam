@@ -66,7 +66,7 @@ class MainTerminal:
             'terminal_lines': [
                 "Connexion distante chiffree. Vous devez dechiffrer le mot de passe. Entrez une lettre et appuyez sur Entree pour commencer a deviner. une lettre du mot de passe, vous avez 15 tentatives pour deviner tous les lettres."
             ],
-            'target_phrase': "LIBERTE EGALITE FRATERNITE"
+            'target_phrase': "INUTILE"
         }
 
     @property
@@ -389,10 +389,10 @@ class MainTerminal:
         state['guessed_letters'].add(letter)
         if letter in state['target_phrase']:
             state['attemps'] += 1
-            self._repair_log(f"Lettre correcte : {letter} (restants {15 - state['attemps']})")
+            self._repair_log(f"Lettre correcte : {letter} (essais restants {15 - state['attemps']})")
         else:
             state['attemps'] += 1
-            self._repair_log(f"Lettre incorrecte : {letter} (restants {15 - state['attemps']})")
+            self._repair_log(f"Lettre incorrecte : {letter} (essais restants {15 - state['attemps']})")
         if self._repair_all_revealed():
             self._repair_log("Toutes les lettres sont revelees. Reparation reussie !")
             state['state'] = "finished"
@@ -400,7 +400,7 @@ class MainTerminal:
             self.screen_connected = True
             return
         if state['attemps'] >= 15:
-            self._repair_log("Échec : trop de tentatives.")
+            self._repair_log("Échec : trop de tentatives. Appuyez sur Entree pour quitter.")
             state['state'] = "failed"
             state['message'] = "Échec de la connexion. Appuyez sur Entree pour quitter."
             return

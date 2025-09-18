@@ -58,10 +58,14 @@ class ExploreMission:
         self.last_shot_time = 0
         self.last_enemy_shot = 0  # Pour les tirs d'ennemis
         self.start_time = time.time()
+        self.max_duration_seconds = 10.0
+        self.duration_expired = False
+        self.force_artifact_next = False
+        self.min_health_threshold = 2  # Truquage: ne jamais descendre en-dessous
         
         # Système de téléportation et patterns
         self.pattern_generated = False
-        self.artifact_chance = 0.05 # 5% de chance d'apparition d'artefact
+        self.artifact_chance = 0.01 # 1% de chance d'apparition d'artefact
         self.evaluated_platforms = set()  # Plateformes déjà évaluées pour le saut
         self.min_enemy_spacing = 30
 
@@ -161,6 +165,11 @@ class ExploreMission:
     def update(self, delta_time: float):
         if not self.is_active:
             return
+
+        # Chrono de mission: après 60s, marquer que la PROCHAINE génération contient un artefact
+        if (not self.duration_expired) and (time.time() - self.start_time >= self.max_duration_seconds):
+            self.duration_expired = True
+            self.force_artifact_next = True
 
         # Vérifier si le héros atteint le bord droit de l'écran
         if self.hero.center_x >= self.overlay_x + self.overlay_w - 20:
@@ -381,12 +390,11 @@ class ExploreMission:
             if (hasattr(bullet, 'change_x') and bullet.change_x < 0 and  # Balle qui va vers la gauche (ennemi)
                 arcade.check_for_collision(bullet, self.hero)):
                 bullet.remove_from_sprite_lists()
-                self.hero.health = max(0, self.hero.health - 3)  # Moins de dégâts que contact direct
-                if self.hero.health <= 0:
-                    hero_boom = Explosion(self.hero.center_x, self.hero.center_y)
-                    self.explosion_list.append(hero_boom)
-                    self.success = False
-                    self.end_mission()
+                # Truquage: ne jamais laisser mourir le héros dans Explore
+                new_health = self.hero.health - 2
+                if new_health < self.min_health_threshold:
+                    new_health = self.min_health_threshold
+                self.hero.health = new_health
 
         # Collisions balles du héros avec ennemis
         for bullet in list(self.bullet_list):
@@ -410,13 +418,11 @@ class ExploreMission:
                 self.explosion_list.append(boom)
                 enemy.remove_from_sprite_lists()
                 
-                # Le héros perd de la vie mais continue sa progression
-                self.hero.health = max(0, self.hero.health - 5)
-                if self.hero.health <= 0:
-                    hero_boom = Explosion(self.hero.center_x, self.hero.center_y)
-                    self.explosion_list.append(hero_boom)
-                    self.success = False  # Mission échouée si le héros meurt
-                    self.end_mission()
+                # Le héros perd de la vie mais ne meurt jamais (truquage discret)
+                new_health = self.hero.health - 5
+                if new_health < self.min_health_threshold:
+                    new_health = self.min_health_threshold
+                self.hero.health = new_health
 
         self.explosion_list.update()
 
@@ -516,7 +522,7 @@ class ExploreMission:
             while attempts < 10:  # Limite les tentatives pour éviter boucle infinie
                 width = random.randint(30, 60)  # Largeur divisée par 2
                 height = 8  # Hauteur divisée par 2
-                x = self.overlay_x + random.randint(40, self.overlay_w - 40)  # Marges divisées par 2
+                x = self.overlay_x + random.randint(40, self.overlay_w - 70)  # Éviter les 50px à droite
                 
                 y = self.platform_levels[level]
                 
@@ -631,11 +637,18 @@ class ExploreMission:
                         placed = True
                 attempts += 1
         
-        # Artefact (cube jaune, 5% de chance) - TOUJOURS au niveau du sol
-        if random.random() < self.artifact_chance:
+        # Artefact (cube jaune) - au niveau du sol
+        must_force_artifact = False
+        if self.force_artifact_next:
+            must_force_artifact = True
+            self.force_artifact_next = False
+        if must_force_artifact or (random.random() < self.artifact_chance):
             artifact = arcade.Sprite()
             artifact.texture = arcade.make_soft_square_texture(8, (255, 215, 0), outer_alpha=255)  # Or explicite, taille divisée par 2
-            artifact.center_x = self.overlay_x + random.randint(self.overlay_w//2, self.overlay_w - 20)  # Marge divisée par 2
+            # Placer l'artefact dans les 70 derniers pixels à droite
+            right_min = max(20, self.overlay_w - 70)
+            right_max = self.overlay_w - 20
+            artifact.center_x = self.overlay_x + random.randint(int(right_min), int(right_max))
             artifact.center_y = self.platform_levels[0]
             self.artifact_list.append(artifact)
     

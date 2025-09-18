@@ -1,6 +1,7 @@
 import arcade
 import random
 import time
+import os
 from utils.constants import (
     SURVEILLANCE_SCREEN_WIDTH, SURVEILLANCE_SCREEN_HEIGHT, SURVEILLANCE_SCREEN_X, SURVEILLANCE_SCREEN_Y,
     PLAYER_SCALING, ENEMY_SCALING, BULLET_SCALING, EXPLOSION_SCALING,
@@ -40,8 +41,138 @@ class Explosion(arcade.Sprite):
             self.remove_from_sprite_lists()
 
 
+class TextureExplosion(arcade.Sprite):
+    """Explosion basée sur une image PNG (ex: Circle_explosion3.png)"""
+    def __init__(self, x: float, y: float, filename: str = 'Circle_explosion3.png'):
+        super().__init__()
+        self.center_x = x
+        self.center_y = y
+        self.start_time = time.time()
+        self.initial_scale = 0.6
+        self.max_scale = 1.1
+        # Localiser le fichier dans assets (recherche récursive)
+        texture = None
+        base_candidates = [
+            'assets',
+            os.path.join(os.path.dirname(__file__), '..', 'assets'),
+        ]
+        base_candidates = [os.path.normpath(p) for p in base_candidates]
+        found = None
+        for base in base_candidates:
+            if not os.path.isdir(base):
+                continue
+            direct = os.path.join(base, filename)
+            if os.path.exists(direct):
+                found = direct
+                break
+            for root, _dirs, files in os.walk(base):
+                for f in files:
+                    if f.lower() == filename.lower():
+                        found = os.path.join(root, f)
+                        break
+                if found:
+                    break
+            if found:
+                break
+        try:
+            if found:
+                texture = arcade.load_texture(found)
+        except Exception:
+            texture = None
+        if texture is not None:
+            self.texture = texture
+            # Mise à l'échelle automatique vers ~64px de haut
+            try:
+                raw_h = float(texture.height)
+                desired_h = 64.0
+                self.scale = desired_h / raw_h if raw_h > 0 else self.initial_scale
+            except Exception:
+                self.scale = self.initial_scale
+        else:
+            # Fallback sur explosion simple si image absente
+            self.texture = arcade.make_circle_texture(50, arcade.color.ORANGE)
+            self.scale = self.initial_scale
+
+    def update(self, delta_time=0):
+        elapsed = time.time() - self.start_time
+        if elapsed < 0.15:
+            progress = elapsed / 0.15
+            self.scale = self.initial_scale + (self.max_scale - self.initial_scale) * progress
+        else:
+            progress = (elapsed - 0.15) / 0.15
+            self.scale = self.max_scale - (self.max_scale - self.initial_scale * 0.1) * progress
+        if elapsed > 0.3:
+            self.remove_from_sprite_lists()
+
+
+class ShipExplosion(arcade.Sprite):
+    """Explosion rapide et grosse pour les explosions du vaisseau"""
+    def __init__(self, x: float, y: float, filename: str = 'Circle_explosion3.png'):
+        super().__init__()
+        self.center_x = x
+        self.center_y = y
+        self.start_time = time.time()
+        self.initial_scale = 1.5  # Plus grosse
+        self.max_scale = 2.5      # Encore plus grosse
+        # Localiser le fichier dans assets (recherche récursive)
+        texture = None
+        base_candidates = [
+            'assets',
+            os.path.join(os.path.dirname(__file__), '..', 'assets'),
+        ]
+        base_candidates = [os.path.normpath(p) for p in base_candidates]
+        found = None
+        for base in base_candidates:
+            if not os.path.isdir(base):
+                continue
+            # Recherche directe à la racine
+            candidate = os.path.join(base, filename)
+            if os.path.exists(candidate):
+                found = candidate
+                break
+            # Recherche récursive
+            for root, _dirs, files in os.walk(base):
+                for fname in files:
+                    if fname.lower() == filename.lower():
+                        found = os.path.join(root, fname)
+                        break
+                if found:
+                    break
+            if found:
+                break
+        if found:
+            try:
+                texture = arcade.load_texture(found)
+                self.texture = texture
+                self.scale = self.initial_scale
+            except Exception:
+                # Fallback: créer une texture colorée
+                self.texture = arcade.make_circle_texture(50, arcade.color.ORANGE)
+                self.scale = self.initial_scale
+        else:
+            # Fallback: créer une texture colorée
+            self.texture = arcade.make_circle_texture(50, arcade.color.ORANGE)
+            self.scale = self.initial_scale
+
+    def update(self, delta_time=0):
+        current_time = time.time()
+        elapsed = current_time - self.start_time
+        
+        # Animation rapide : grandir puis rétrécir en 0.2 secondes
+        if elapsed < 0.1:  # Première moitié : grandir
+            progress = elapsed / 0.1
+            self.scale = self.initial_scale + (self.max_scale - self.initial_scale) * progress
+        else:  # Deuxième moitié : rétrécir et disparaître
+            progress = (elapsed - 0.1) / 0.1
+            self.scale = self.max_scale - (self.max_scale - self.initial_scale * 0.1) * progress
+        
+        # Disparition après 0.2 secondes
+        if elapsed > 0.2:
+            self.remove_from_sprite_lists()
+
+
 class BattleMission:
-    def __init__(self, hero, enemies_to_kill=None):
+    def __init__(self, hero, enemies_to_kill=None, on_game_over_callback=None, on_game_end_callback=None):
         # Listes de sprites
         self.player_list = None
         self.enemy_list = None
@@ -51,6 +182,10 @@ class BattleMission:
 
         self.hero = hero
         self.player_sprite = None
+        
+        # Callbacks pour les scènes de fin de jeu
+        self.on_game_over_callback = on_game_over_callback
+        self.on_game_end_callback = on_game_end_callback
         self.last_enemy_spawn = 0
         self.last_bullet_shot = 0
         self.start_time = time.time()
@@ -58,19 +193,34 @@ class BattleMission:
         self.is_active = False
         self.mission_completed = False
         self.enemies_destroyed = 0
-        # Nombre d'ennemis choisi aléatoirement entre 20 et 30
+        # Nombre d'ennemis choisi aléatoirement entre 20 et 30 (le boss compte comme 1 ennemi)
         self.enemies_to_kill = enemies_to_kill if enemies_to_kill is not None else random.randint(25, 45)
+        self.boss_counted = False  # Pour s'assurer que le boss n'est compté qu'une fois
         
         # Boss
         self.boss_active = False
         self.boss_sprite = None
         self.boss_list = None
+        self.boss_death_time = None  # Pour le délai après la mort du boss
+        self.boss_death_x = None  # Position X du boss à sa mort
+        self.boss_death_y = None  # Position Y du boss à sa mort
+        self.last_continuous_explosion = None  # Dernière explosion continue
+        
+        # Effet de défaite du héros
+        self.hero_death_time = None  # Moment de la mort du héros
+        self.hero_death_x = None  # Position X du héros à sa mort
+        self.hero_death_y = None  # Position Y du héros à sa mort
+        self.screen_red_filter = False  # Filtre rouge sur l'écran
+        self.screen_black = False  # Écran noir
+        self.final_explosion_time = None  # Moment de l'explosion finale
+        self.ship_explosion_list = arcade.SpriteList()  # Explosions sur le vaisseau
         self.boss_health = 40
         self.boss_max_health = 40
         self.boss_bullet_list = None
         self.last_boss_shot = 0
         # Résultat
         self.success = False
+        
         # Bounds of the surveillance overlay (can be updated by the scene)
         self.overlay_x = SURVEILLANCE_SCREEN_X
         self.overlay_y = SURVEILLANCE_SCREEN_Y
@@ -121,13 +271,92 @@ class BattleMission:
         print(f"Mission completed flag: {self.mission_completed}")
         print(f"Mission active flag: {self.is_active}")
     
+    def end_mission_final(self):
+        """Termine la mission finale - le héros ne revient pas au vaisseau (réussite ou défaite)"""
+        self.is_active = False
+        self.mission_completed = True
+        status = "RÉUSSIE" if self.success else "ÉCHOUÉE"
+        print(f"MISSION FINALE {status} - Le héros ne reviendra pas au vaisseau")
+        print(f"Mission completed flag: {self.mission_completed}")
+        print(f"Mission active flag: {self.is_active}")
+        
+        # Déclencher la scène appropriée
+        if self.success and self.on_game_end_callback:
+            print("Déclenchement de la scène de victoire")
+            self.on_game_end_callback()
+        elif not self.success and self.on_game_over_callback:
+            print("Déclenchement de la scène de défaite")
+            self.on_game_over_callback()
+    
     def update(self, delta_time):
         if not self.is_active:
             return
         
-        # Déclencher le boss quand le quota est atteint
-        if (not self.boss_active) and (self.enemies_destroyed >= self.enemies_to_kill):
+        # Vérifier l'effet de défaite du héros
+        if hasattr(self, 'hero_death_time') and self.hero_death_time is not None:
+            elapsed = time.time() - self.hero_death_time
+            
+            if elapsed < 0.5:  # 0.5s : explosion du héros
+                if elapsed < 0.1 and len(self.explosion_list) == 0:  # Créer l'explosion du héros au début
+                    hero_explosion = TextureExplosion(self.hero_death_x, self.hero_death_y, 'Circle_explosion3.png')
+                    self.explosion_list.append(hero_explosion)
+            elif elapsed < 1.0:  # 0.5-1.0s : écran noir sur la télé
+                self.screen_black = True
+                self.screen_red_filter = False
+            elif elapsed < 2.0:  # 1.0-2.0s : clignotement rouge sur tout l'écran
+                self.screen_black = False
+                self.screen_red_filter = True
+            else:  # 2.0s+ : explosions continues pendant 10 secondes
+                if self.final_explosion_time is None:
+                    self.final_explosion_time = time.time()
+                
+                # Créer des explosions continues toutes les 0.1 secondes
+                if time.time() - self.final_explosion_time >= 0.1:
+                    explosion_textures = ['Circle_explosion3.png', 'Circle_explosion4.png', 'Circle_explosion5.png', 'Circle_explosion6.png']
+                    # Créer 3-5 explosions aléatoires à chaque cycle
+                    for i in range(random.randint(3, 5)):
+                        explosion_x = random.randint(0, 3000)  # Largeur du vaisseau
+                        explosion_y = random.randint(0, 1000)  # Hauteur du vaisseau
+                        explosion_texture = random.choice(explosion_textures)
+                        ship_explosion = ShipExplosion(explosion_x, explosion_y, explosion_texture)
+                        self.ship_explosion_list.append(ship_explosion)
+                    self.final_explosion_time = time.time()
+                
+                # Mettre à jour les explosions du vaisseau pour qu'elles disparaissent
+                self.ship_explosion_list.update()
+                
+                if elapsed >= 12.0:  # Terminer après 12 secondes - MISSION FINALE
+                    self.end_mission_final()  # Mission finale, le héros ne revient pas
+            return  # Ne pas continuer l'update pendant l'effet de défaite
+        
+        # Vérifier si on doit terminer la mission après la mort du boss
+        if hasattr(self, 'boss_death_time') and self.boss_death_time is not None:
+            # Créer des explosions continues pendant le délai
+            if time.time() - self.last_continuous_explosion >= 0.15:  # Nouvelle explosion toutes les 0.15 secondes
+                # Supprimer les anciennes explosions pour éviter l'accumulation
+                self.explosion_list.clear()
+                
+                explosion_textures = ['Circle_explosion3.png', 'Circle_explosion4.png', 'Circle_explosion5.png', 'Circle_explosion6.png']
+                # Créer 2-3 explosions aléatoires autour de la position du boss
+                for i in range(random.randint(3, 5)):
+                    explosion_x = self.boss_death_x + random.uniform(-40, 40)
+                    explosion_y = self.boss_death_y + random.uniform(-40, 40)
+                    explosion_texture = random.choice(explosion_textures)
+                    continuous_explosion = TextureExplosion(explosion_x, explosion_y, explosion_texture)
+                    self.explosion_list.append(continuous_explosion)
+                self.last_continuous_explosion = time.time()
+            
+            if time.time() - self.boss_death_time >= 2.0:  # 2 secondes de délai (réduit)
+                self.end_mission_final()  # Mission finale réussie - le héros ne revient pas
+                self.boss_death_time = None
+            return  # Ne pas continuer l'update pendant le délai
+        
+        # Déclencher le boss quand le quota d'ennemis normaux est atteint
+        if (not self.boss_active) and (self.enemies_destroyed >= self.enemies_to_kill - 1):
             self.spawn_boss()
+            # Compter le boss comme un ennemi à tuer
+            if not self.boss_counted:
+                self.boss_counted = True
 
         # Spawn d'ennemis (désactivé quand le boss est présent)
         if (not self.boss_active) and (time.time() - self.last_enemy_spawn > SPAWN_INTERVAL):
@@ -219,7 +448,7 @@ class BattleMission:
             if hit_list:
                 bullet.remove_from_sprite_lists()
                 for enemy in hit_list:
-                    explosion = Explosion(enemy.center_x, enemy.center_y)
+                    explosion = TextureExplosion(enemy.center_x, enemy.center_y, 'Circle_explosion3.png')
                     self.explosion_list.append(explosion)
                     enemy.remove_from_sprite_lists()
                     self.enemies_destroyed += 1
@@ -230,21 +459,39 @@ class BattleMission:
                 if arcade.check_for_collision(bullet, self.boss_sprite):
                     bullet.remove_from_sprite_lists()
                     self.boss_health -= 2
-                    impact = Explosion(bullet.center_x, bullet.center_y)
+                    impact = TextureExplosion(bullet.center_x, bullet.center_y, 'Circle_explosion3.png')
                     self.explosion_list.append(impact)
                     if self.boss_health <= 0:
-                        boss_explosion = Explosion(self.boss_sprite.center_x, self.boss_sprite.center_y)
-                        self.explosion_list.append(boss_explosion)
+                        # Créer plusieurs explosions autour du boss
+                        boss_x, boss_y = self.boss_sprite.center_x, self.boss_sprite.center_y
+                        explosion_textures = ['Circle_explosion3.png', 'Circle_explosion4.png', 'Circle_explosion5.png', 'Circle_explosion6.png']
+                        for i in range(6):  # 6 explosions
+                            # Position aléatoire autour du boss (rayon de 30-60 pixels)
+                            angle = random.uniform(0, 2 * 3.14159)
+                            distance = random.uniform(30, 60)
+                            explosion_x = boss_x + distance * random.uniform(-1, 1)
+                            explosion_y = boss_y + distance * random.uniform(-1, 1)
+                            # Choisir une texture d'explosion aléatoire
+                            explosion_texture = random.choice(explosion_textures)
+                            boss_explosion = TextureExplosion(explosion_x, explosion_y, explosion_texture)
+                            self.explosion_list.append(boss_explosion)
+                        
                         self.boss_sprite.remove_from_sprite_lists()
                         self.boss_active = False
+                        self.enemies_destroyed += 1  # Compter le boss comme un ennemi détruit
                         self.success = True
-                        self.end_mission()
+                        # Délai pour laisser voir les explosions avant de terminer la mission
+                        self.boss_death_time = time.time()
+                        # Position du boss pour les explosions continues
+                        self.boss_death_x = boss_x
+                        self.boss_death_y = boss_y
+                        self.last_continuous_explosion = time.time()
 
         # Collision ennemis / héros (le héros prend des dégâts)
         for enemy in list(self.enemy_list):
             if arcade.check_for_collision(enemy, self.player_sprite):
                 # L'ennemi explose (il est détruit)
-                explosion = Explosion(enemy.center_x, enemy.center_y)
+                explosion = TextureExplosion(enemy.center_x, enemy.center_y, 'Circle_explosion3.png')
                 self.explosion_list.append(explosion)
                 enemy.remove_from_sprite_lists()
                 # Appliquer des dégâts au héros
@@ -252,12 +499,13 @@ class BattleMission:
                 self.hero.health = max(0, self.hero.health - damage)
                 # Mettre à jour l'état du héros
                 if self.hero.health <= 0:
-                    # Le héros explose aussi (il meurt)
-                    hero_explosion = Explosion(self.hero.center_x, self.hero.center_y)
-                    self.explosion_list.append(hero_explosion)
+                    # Déclencher l'effet de défaite du héros
+                    self.hero_death_time = time.time()
+                    self.hero_death_x = self.hero.center_x
+                    self.hero_death_y = self.hero.center_y
+                    self.screen_black = True
                     self.success = False
                     self.hero.state = HERO_STATE_FAILED
-                    self.end_mission()
                 else:
                     self.hero.state = HERO_STATE_FIGHTING
 
@@ -271,12 +519,13 @@ class BattleMission:
                 self.hero.health = max(0, self.hero.health - damage)
                 # Mettre à jour l'état du héros
                 if self.hero.health <= 0:
-                    # Le héros explose aussi (il meurt)
-                    hero_explosion = Explosion(self.hero.center_x, self.hero.center_y)
-                    self.explosion_list.append(hero_explosion)
+                    # Déclencher l'effet de défaite du héros (même logique que collision ennemis)
+                    self.hero_death_time = time.time()
+                    self.hero_death_x = self.hero.center_x
+                    self.hero_death_y = self.hero.center_y
+                    self.screen_black = True
                     self.success = False
                     self.hero.state = HERO_STATE_FAILED
-                    self.end_mission()
                 else:
                     # Le héros reste en état de combat (pas d'explosion)
                     self.hero.state = HERO_STATE_FIGHTING
@@ -285,13 +534,16 @@ class BattleMission:
         for boss_bullet in list(self.boss_bullet_list):
             if arcade.check_for_collision(boss_bullet, self.player_sprite):
                 boss_bullet.remove_from_sprite_lists()
-                damage = 8
+                damage = 40
                 self.hero.health = max(0, self.hero.health - damage)
                 if self.hero.health <= 0:
-                    hero_explosion = Explosion(self.hero.center_x, self.hero.center_y)
-                    self.explosion_list.append(hero_explosion)
+                    # Déclencher l'effet de défaite du héros (même logique que les autres)
+                    self.hero_death_time = time.time()
+                    self.hero_death_x = self.hero.center_x
+                    self.hero_death_y = self.hero.center_y
+                    self.screen_black = True
+                    self.success = False
                     self.hero.state = HERO_STATE_FAILED
-                    self.end_mission()
                 else:
                     self.hero.state = HERO_STATE_FIGHTING
     
@@ -373,10 +625,64 @@ class BattleMission:
             arcade.draw_lrbt_rectangle_filled(left, fill_right, bottom, top, arcade.color.GREEN)
             # Contour
             arcade.draw_lrbt_rectangle_outline(left, right, bottom, top, arcade.color.WHITE)
+        
+        # Dessiner les explosions du vaisseau (si elles existent)
+        if hasattr(self, 'ship_explosion_list') and len(self.ship_explosion_list) > 0:
+            self.ship_explosion_list.draw()
+        
+        # Effets visuels de défaite du héros
+        if hasattr(self, 'hero_death_time') and self.hero_death_time is not None:
+            elapsed = time.time() - self.hero_death_time
+            
+            # Écran noir sur la télé (overlay) - reste noir jusqu'à la fin
+            if elapsed >= 0.5:  # Après 0.5s, la télé reste noire
+                arcade.draw_lrbt_rectangle_filled(
+                    self.overlay_x, self.overlay_x + self.overlay_w,
+                    self.overlay_y, self.overlay_y + self.overlay_h,
+                    arcade.color.BLACK
+                )
+            
+            # Clignotement rouge sur tout l'écran (seulement pendant 1 seconde)
+            if self.screen_red_filter:  # 1.0-2.0s : clignotement rouge sur tout l'écran
+                blink_cycle = int(elapsed * 3) % 2  # Clignote 1.5 fois par seconde
+                if blink_cycle == 0:  # Phase rouge
+                    arcade.draw_lrbt_rectangle_filled(
+                        0, 3000,  # Largeur complète du vaisseau
+                        0, 1000,  # Hauteur complète du vaisseau
+                        (255, 0, 0, 150)  # Rouge semi-transparent
+                    )
 
     def spawn_boss(self):
-        # Créer un grand ennemi fixe sur la droite
-        self.boss_sprite = arcade.SpriteSolidColor(100, 240, arcade.color.DARK_RED)
+        # Créer le boss avec la texture finale si disponible
+        texture = None
+        # Chercher l'image dans plusieurs emplacements possibles
+        base_candidates = [
+            'assets',
+            os.path.join(os.path.dirname(__file__), '..', 'assets'),
+        ]
+        base_candidates = [os.path.normpath(p) for p in base_candidates]
+        for base in base_candidates:
+            candidate = os.path.join(base, 'final-boss.png')
+            if os.path.exists(candidate):
+                try:
+                    texture = arcade.load_texture(candidate)
+                    break
+                except Exception:
+                    texture = None
+        if texture is not None:
+            self.boss_sprite = arcade.Sprite()
+            self.boss_sprite.texture = texture
+            # Adapter la taille du boss à l'overlay (environ 60% de la hauteur)
+            desired_h = self.overlay_h * 0.6
+            try:
+                raw_h = float(texture.height)
+                self.boss_sprite.scale = desired_h / raw_h if raw_h > 0 else 1.0
+            except Exception:
+                self.boss_sprite.scale = 1.0
+        else:
+            # Fallback: bloc de couleur si texture manquante
+            self.boss_sprite = arcade.SpriteSolidColor(100, 240, arcade.color.DARK_RED)
+        # Position sur la droite de l'overlay
         self.boss_sprite.center_x = self.overlay_x + self.overlay_w - 60
         self.boss_sprite.center_y = self.overlay_y + self.overlay_h // 2
         self.boss_list.append(self.boss_sprite)

@@ -24,6 +24,8 @@ class Agent(arcade.Sprite):
         self.is_breathing = False
         self.facing = 'right'
         self.was_moving = False
+        
+        # Charger animations/textures standards
         self.load_textures()
         # Fallback si pas de textures disponibles
         if (not self.walk_textures and not self.walk_textures_left and not self.walk_textures_right

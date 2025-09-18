@@ -6,6 +6,9 @@ from entities.ship import Ship
 from entities.mission_system import MissionSystem
 from entities.surveillance_screen import SurveillanceScreen
 from mini_games.wire_puzzle_overlay import WirePuzzleOverlay
+from mini_games.repair_overlay import RepairMinigameOverlay
+from scenes.game_over_scene import GameOverScene
+from scenes.game_end_scene import GameEndScene
 
 from mini_games.terminal import MainTerminal
 
@@ -145,8 +148,27 @@ class MainScene(arcade.View):
         # Lier les systèmes
         self.mission_system.set_hero(self.hero)
         self.surveillance_screen.set_hero(self.hero)
+        # Connecter le MissionSystem à l'écran de surveillance pour révéler la vie après le mini-jeu
+        if hasattr(self.surveillance_screen, 'set_mission_system'):
+            self.surveillance_screen.set_mission_system(self.mission_system)
+        # État de connexion initial: non connecté tant que le mini-jeu n'est pas terminé
+        if hasattr(self.surveillance_screen, 'set_connected'):
+            self.surveillance_screen.set_connected(False)
         self.agent.set_mission_system(self.mission_system)
         self.agent.set_collision_list(self.collision_list)
+        
+        # Définir les callbacks pour les scènes de fin de jeu
+        def on_game_over():
+            """Callback pour la scène de défaite"""
+            game_over_scene = GameOverScene()
+            self.window.show_view(game_over_scene)
+        
+        def on_game_end():
+            """Callback pour la scène de victoire"""
+            game_end_scene = GameEndScene()
+            self.window.show_view(game_end_scene)
+        
+        self.hero.set_game_end_callbacks(on_game_over, on_game_end)
         
         # Passer les points d'interaction du vaisseau au système de missions
         self.mission_system.set_ship_interaction_points(self.ship.get_interaction_points())
@@ -252,50 +274,100 @@ class MainScene(arcade.View):
         self.gui_camera.use()
 
         # Dessiner l'écran de surveillance en coordonnées écran et le faire suivre l'agent
+        # Afficher dès le lancement, même sans mission active (affichera le message d'attente)
+        self._update_surveillance_screen_position()
+        # Synchroniser les missions du héros avec la position/tailles de l'écran de surveillance
+        self._sync_mission_overlay_bounds()
+        # Si une mission démarre à cette frame, s'assurer que le contenu apparaît déjà au bon endroit
+        self.surveillance_screen.draw()
         if should_draw_surveillance:
-            self._update_surveillance_screen_position()
-            # Synchroniser les missions du héros avec la position/tailles de l'écran de surveillance
-            self._sync_mission_overlay_bounds()
-            # Si une mission démarre à cette frame, s'assurer que le contenu apparaît déjà au bon endroit
-            # (la méthode set_screen_bounds translate déjà les sprites existants)
-            self.surveillance_screen.draw()
             # Marquer que l'écran était affiché (pour la logique de résultat de pari)
             self.surveillance_was_displayed = True
 
         # Dessiner le Wire Puzzle en overlay s'il est actif
         if hasattr(self, 'wire_overlay') and self.wire_overlay is not None:
             self.wire_overlay.on_draw()
+        # Dessiner les mini-jeux de réparation/scanner
+        if hasattr(self, 'repair_overlay') and self.repair_overlay is not None:
+            self.repair_overlay.on_draw()
+        if hasattr(self, 'enemy_scan_overlay') and self.enemy_scan_overlay is not None:
+            self.enemy_scan_overlay.on_draw()
 
         self.draw_floating_message()
         self.draw_ui()
 
         # Afficher le terminal si initialisé
         if self.terminal:
+            # Synchroniser l'état de connexion écran depuis le terminal
+            try:
+                if hasattr(self.surveillance_screen, 'set_connected'):
+                    self.surveillance_screen.set_connected(bool(getattr(self.terminal, 'screen_connected', False)))
+            except Exception:
+                pass
             self.terminal.on_draw()
             
     
     def draw_ui(self):
-        # Titre
-        arcade.draw_text("Agent de Missions", 10, self.ui_height - 30, 
-                        arcade.color.WHITE, 24, bold=True)
         
-        # Crédits
-        
-        arcade.draw_text(f"Crédits: {self.mission_system.gold}", 
-                            10, self.ui_height - 60, arcade.color.GOLD, 18)
+        # Crédits (encore plus haut, aligné avec les titres)
+        x_left = 10
+        y_cursor = self.ui_height - 6
+        arcade.draw_text(f"Crédits: {self.mission_system.gold}", x_left, y_cursor, arcade.color.GOLD, 18, bold=True)
+        y_cursor -= 26
+
+        # Objectifs (tâches de réparation)
+        # États
+        try:
+            repair_health_done = bool(getattr(self.mission_system, 'wire_puzzle_completed', False))
+        except Exception:
+            repair_health_done = False
+        try:
+            repair_enemies_done = bool(getattr(self.mission_system, 'enemies_screen_completed', False))
+        except Exception:
+            repair_enemies_done = False
+        try:
+            repair_connection_done = bool(
+                getattr(self.surveillance_screen, 'connected', False) or getattr(self, 'surveillance_screen_connected', False)
+            )
+        except Exception:
+            repair_connection_done = False
+        try:
+            missions_completed = int(getattr(self.mission_system, 'missions_completed_success_count', 0))
+        except Exception:
+            missions_completed = 0
+
+        # Faisabilité
+        show_repair_health = True
+        show_repair_connection = True
+        show_repair_enemies = (missions_completed >= 1) or repair_enemies_done
+
+        if show_repair_health or show_repair_connection or show_repair_enemies:
+            arcade.draw_text("Objectifs:", x_left, y_cursor, arcade.color.WHITE, 14, bold=True)
+            y_cursor -= 20
+
+            def draw_obj(label, done, y):
+                icon = "✔" if done else "✖"
+                color = arcade.color.LIGHT_GREEN if done else arcade.color.LIGHT_GRAY
+                arcade.draw_text(f"{icon} {label}", x_left, y, color, 13)
+
+            if show_repair_health:
+                draw_obj("Réparer la santé", repair_health_done, y_cursor)
+                y_cursor -= 18
+            if show_repair_enemies:
+                draw_obj("Réparer le scanner ennemis", repair_enemies_done, y_cursor)
+                y_cursor -= 18
+            if show_repair_connection:
+                draw_obj("Connecter l'écran sur le terminal", repair_connection_done, y_cursor)
+                y_cursor -= 26
         
         # État de la mission
         if self.mission_system.current_mission:
             mission = self.mission_system.current_mission
-            arcade.draw_text(f"Mission: {mission['name']}", 
-                            10, self.ui_height - 90, arcade.color.WHITE, 16)
-            arcade.draw_text(f"Progression: {mission.get('progress', 0):.1f}%", 
-                            10, self.ui_height - 110, arcade.color.WHITE, 16)
+            arcade.draw_text(f"Mission: {mission['name']}", x_left, y_cursor, arcade.color.WHITE, 16)
+            y_cursor -= 22
         else:
-            arcade.draw_text("Aucune mission active", 
-                            10, self.ui_height - 90, arcade.color.GRAY, 16)
-            arcade.draw_text("Allez au Bureau des Missions pour assigner une quête", 
-                            10, self.ui_height - 110, arcade.color.LIGHT_GRAY, 14)
+            arcade.draw_text("Aucune mission active", x_left, y_cursor, arcade.color.WHITE, 16)
+            y_cursor -= 22
         
         # Contrôles
         arcade.draw_text("FLÈCHES: Se déplacer | ESPACE: Interagir", 
@@ -652,6 +724,20 @@ class MainScene(arcade.View):
                     self.wire_overlay = None
                 self.wire_overlay = WirePuzzleOverlay(self.window, on_exit_callback=_on_complete, mission_system=self.mission_system)
 
+            # Lancer le mini-jeu de réparation SANTÉ si demandé (overlay)
+            if getattr(self.mission_system, 'repair_requested', False):
+                self.mission_system.repair_requested = False
+                def _on_repair_complete():
+                    self.repair_overlay = None
+                self.repair_overlay = RepairMinigameOverlay(self.window, on_exit_callback=_on_repair_complete, mission_system=self.mission_system, completion_attr="repair_completed", title="RÉPARATION ÉCRAN - SYSTÈME DE SANTÉ")
+
+            # Lancer le mini-jeu de réparation SCANNER ENNEMIS si demandé (overlay)
+            if getattr(self.mission_system, 'enemies_screen_requested', False):
+                self.mission_system.enemies_screen_requested = False
+                def _on_scan_complete():
+                    self.enemy_scan_overlay = None
+                self.enemy_scan_overlay = RepairMinigameOverlay(self.window, on_exit_callback=_on_scan_complete, mission_system=self.mission_system, completion_attr="enemies_screen_completed", title="CALIBRATION SCANNER ENNEMIS")
+
             # Mettre à jour la caméra APRÈS toutes les mises à jour
             self.update_camera()
 
@@ -717,6 +803,12 @@ class MainScene(arcade.View):
     def on_key_press(self, key, modifiers):
         if hasattr(self, 'wire_overlay') and self.wire_overlay is not None:
             self.wire_overlay.on_key_press(key, modifiers)
+            return
+        if hasattr(self, 'repair_overlay') and self.repair_overlay is not None:
+            self.repair_overlay.on_key_press(key, modifiers)
+            return
+        if hasattr(self, 'enemy_scan_overlay') and self.enemy_scan_overlay is not None:
+            self.enemy_scan_overlay.on_key_press(key, modifiers)
             return
         if self.terminal:
             self.terminal.on_key_press(key, modifiers)

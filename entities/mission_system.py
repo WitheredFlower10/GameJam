@@ -1,5 +1,6 @@
 import random
 import math
+import time
 from utils.constants import MISSION_DURATION, CREDIT_INITIAL
 from mini_games.terminal import MainTerminal
 
@@ -34,6 +35,18 @@ class MissionSystem:
         self.wire_puzzle_requested = False
         # Flag pour marquer si le puzzle wire a été complété
         self.wire_puzzle_completed = False
+
+        # Mini-jeu de réparation (réacteur/écran)
+        self.repair_requested = False
+        self.repair_completed = False
+
+        # Mini-jeu scanner ennemis (débloque compteur ennemis)
+        self.enemies_screen_requested = False
+        self.enemies_screen_completed = False
+        # Délai de départ de mission (affichage écran)
+        self.travel_end_time = None
+        # Compteur de missions réussies (pour déblocages)
+        self.missions_completed_success_count = 0
         
         # Référence au ship pour gérer le HeroNPC
         self.ship = None
@@ -94,6 +107,11 @@ class MissionSystem:
     
     def start_random_mission(self):
         if not self.current_mission:
+            # Vérifier que les missions sont disponibles
+            if not self.available_missions:
+                print("ERREUR: Aucune mission disponible! Réinitialisation...")
+                self.create_mission_templates()
+            
             # Première interaction: Exploration, seconde: Élimination (mission finale)
             if self.missions_assigned_count == 0:
                 exploration = [m for m in self.available_missions if m.get('type') == 'Exploration']
@@ -117,6 +135,30 @@ class MissionSystem:
     
     def update(self, delta_time, ship=None):
         self.mission_timer += delta_time
+        # Démarrer la mission quand le compte à rebours est terminé
+        if (self.travel_end_time is not None) and (time.time() >= self.travel_end_time) and (self.current_mission is None):
+            # Démarrer la mission maintenant
+            self.travel_end_time = None
+            # Choisir et assigner la mission
+            if not self.available_missions:
+                print("ERREUR: Aucune mission disponible! Réinitialisation...")
+                self.create_mission_templates()
+            
+            if self.missions_assigned_count == 0:
+                exploration = [m for m in self.available_missions if m.get('type') == 'Exploration']
+                mission_template = exploration[0] if exploration else random.choice(self.available_missions)
+            else:
+                elimination = [m for m in self.available_missions if m.get('type') == 'Élimination']
+                mission_template = elimination[0] if elimination else random.choice(self.available_missions)
+
+            self.current_mission = mission_template.copy()
+            self.current_mission['progress'] = 0
+            self.current_mission['start_time'] = self.mission_timer
+            if self.hero:
+                self.hero.start_mission(mission_template)
+            self.gold += 100
+            self.missions_assigned_count += 1
+            print(f"Mission '{self.current_mission['name']}' assignée au héros après le trajet!")
         
         if self.current_mission:
             # Mettre à jour la progression de la mission
@@ -138,7 +180,13 @@ class MissionSystem:
     def complete_mission(self, ship=None):
         if self.current_mission:
             print(f"Mission '{self.current_mission['name']}' réussie!")
+            # Incrémenter le nombre de missions réussies
+            try:
+                self.missions_completed_success_count += 1
+            except Exception:
+                self.missions_completed_success_count = 1
             self.current_mission = None
+            self.travel_end_time = None
             # Faire réapparaître le héros
             if ship:
                 ship.set_hero_on_mission(False)
@@ -147,6 +195,7 @@ class MissionSystem:
         if self.current_mission:
             print(f"Mission '{self.current_mission['name']}' échouée!")
             self.current_mission = None
+            self.travel_end_time = None
             # Faire réapparaître le héros
             if ship:
                 ship.set_hero_on_mission(False)
@@ -155,6 +204,7 @@ class MissionSystem:
         if self.current_mission:
             print(f"Mission '{self.current_mission['name']}' expirée!")
             self.current_mission = None
+            self.travel_end_time = None
             # Faire réapparaître le héros
             if ship:
                 ship.set_hero_on_mission(False)
@@ -162,11 +212,29 @@ class MissionSystem:
     def get_nearby_interactions(self, agent_x):
         # Retourner les points d'interaction à proximité de l'agent (X-only) en utilisant range_x par point
         nearby = []
-        for point in self.ship_interaction_points:
+        # Utiliser la liste dynamique du ship (héros inclus uniquement si visible), fallback sur la liste statique sinon
+        points = []
+        ship = getattr(self, 'ship', None)
+        if ship is not None and hasattr(ship, 'get_interaction_points'):
             try:
-                # Filtrer "Amélioration Surveillance" si déjà complété
-                if point.get('name') == "Amélioration Surveillance" and self.wire_puzzle_completed:
-                    continue
+                points = ship.get_interaction_points()
+            except Exception:
+                points = self.ship_interaction_points
+        else:
+            points = self.ship_interaction_points
+        for point in points:
+            try:
+                # Filtrer tous les points déjà complétés
+                if hasattr(self, 'is_point_completed'):
+                    if self.is_point_completed(point.get('name', '')):
+                        continue
+                # Cacher/ignorer le point du héros si le héros n'est pas présent ou si une mission est en cours
+                if point.get('type') == 'hero_missions':
+                    if self.current_mission:
+                        continue
+                    hero_npc = getattr(ship, 'hero_npc', None) if ship is not None else None
+                    if (hero_npc is None) or (not getattr(hero_npc, 'visible', False)):
+                        continue
                 px = float(point.get('x', 0.0))
                 threshold = float(point.get('range_x', 50.0))
                 if abs(px - float(agent_x)) < threshold:
@@ -177,32 +245,36 @@ class MissionSystem:
     
     def interact_with_point(self, point_name, ship=None):
         # Gérer les interactions avec les points d'intérêt
-        if point_name == "Bureau des Missions":
-            # Ancienne interaction - garde pour compatibilité
-            if not self.current_mission:
-                self.start_random_mission()
-                if ship:
-                    ship.set_hero_on_mission(True)  # Faire disparaître le héros
-                return "Mission assignée au héros !"
-            else:
-                return "Une mission est déjà en cours."
-        elif point_name == "Parler au Héros":
-            # Nouvelle interaction avec le HeroNPC
-            if not self.current_mission:
-                self.start_random_mission()
-                if ship:
-                    ship.set_hero_on_mission(True)  # Faire disparaître le héros
-                return "Mission assignée au héros ! Il part en mission."
-            else:
+        if point_name == "DONNER LA QUETE":
+            # Déclenche uniquement un compte à rebours de 10s avant le démarrage effectif
+            if self.current_mission:
                 return "Le héros est déjà en mission."
-        elif point_name == "Amélioration Surveillance":
-            # Vérifier si le puzzle n'a pas déjà été complété
+            if getattr(self, 'travel_end_time', None):
+                return "Le héros est déjà en route."
+            try:
+                # Faire disparaître le héros immédiatement
+                if ship:
+                    ship.set_hero_on_mission(True)
+                # Puis démarrer le compte à rebours
+                self.travel_end_time = time.time() + 10.0
+                return "Le héros se dirige à la quête. Départ dans 10s."
+            except Exception:
+                return "Erreur: impossible de démarrer le trajet."
+        elif point_name == "REPARATION / VIE":
+            # Lancer le wire puzzle pour débloquer l'affichage de la vie
             if self.wire_puzzle_completed:
-                return "Amélioration déjà effectuée."
-            # Remplacer par le lancement du mini-jeu Wire Puzzle
+                return "Réparation Santé déjà effectuée."
             self.wire_puzzle_requested = True
             return "Wire Puzzle lancé !"
-        elif point_name == "Station de Paris":
+        elif point_name == "REPARATION / ENNEMIS":
+            # Lancer le mini-jeu spécifique pour débloquer le compteur d'ennemis
+            if getattr(self, 'missions_completed_success_count', 0) < 1:
+                return "Réparation Scanner indisponible: terminez d'abord une mission."
+            if self.enemies_screen_completed:
+                return "Réparation Scanner déjà effectuée."
+            self.enemies_screen_requested = True
+            return "Réparation Scanner lancée !"
+        elif point_name == "PARIER":
             if not self.current_mission:
                 return "Aucune mission active pour parier."
             elif self.bet_placed:
@@ -214,7 +286,7 @@ class MissionSystem:
                 return "Interface de paris ouverte !"
         elif point_name == "Analyse de Données":
             return "Données analysées !"
-        elif point_name == "Terminal":
+        elif point_name == "TERMINAL":
             self.terminal_on = True
         else:
             return "Interaction effectuée."
@@ -225,6 +297,20 @@ class MissionSystem:
     def set_ship(self, ship):
         """Définir la référence au ship pour gérer le HeroNPC"""
         self.ship = ship
+
+    def is_point_completed(self, point_name):
+        """Retourne True si le point d'intérêt nommé est complété et ne doit plus s'afficher."""
+        try:
+            name = str(point_name)
+        except Exception:
+            name = point_name
+        # Réparations spécifiques: disparaissent après réussite
+        if name == "REPARATION / VIE":
+            return bool(self.wire_puzzle_completed)
+        if name == "REPARATION / ENNEMIS":
+            return bool(self.enemies_screen_completed)
+        # Par défaut: non complété (affichage autorisé)
+        return False
     
     def place_bet(self, bet_type, amount):
         # Placer un pari sur la mission

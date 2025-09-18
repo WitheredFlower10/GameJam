@@ -35,6 +35,10 @@ class Hero(arcade.Sprite):
         self.battle_mission = None
         # Mission d'exploration
         self.explore_mission = None
+        
+        # Callbacks pour les scènes de fin de jeu
+        self.on_game_over_callback = None
+        self.on_game_end_callback = None
     
     def update(self, delta_time):
         super().update()
@@ -128,8 +132,10 @@ class Hero(arcade.Sprite):
             import random
             enemies_to_kill = random.randint(5, 6)
             print(f"Mission créée : {enemies_to_kill} ennemis à tuer")
-            # Passer l'instance du héros et le nombre d'ennemis à la mission
-            self.battle_mission = BattleMission(self, enemies_to_kill)
+            # Passer l'instance du héros, le nombre d'ennemis et les callbacks à la mission
+            self.battle_mission = BattleMission(self, enemies_to_kill, 
+                                              on_game_over_callback=getattr(self, 'on_game_over_callback', None),
+                                              on_game_end_callback=getattr(self, 'on_game_end_callback', None))
             self.battle_mission.start_mission()
         elif mission_data.get('type') == 'Exploration':
             from entities.explore_mission import ExploreMission
@@ -165,3 +171,8 @@ class Hero(arcade.Sprite):
                 'hero_health': self.health
             }
         return None
+    
+    def set_game_end_callbacks(self, on_game_over_callback, on_game_end_callback):
+        """Définit les callbacks pour les scènes de fin de jeu"""
+        self.on_game_over_callback = on_game_over_callback
+        self.on_game_end_callback = on_game_end_callback
