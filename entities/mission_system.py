@@ -259,7 +259,8 @@ class MissionSystem:
                 if ship:
                     ship.set_hero_on_mission(True)
                 # Puis démarrer le compte à rebours
-                self.travel_end_time = time.time() + 1  # 10 secondes de délai avant départ
+                self.travel_end_time = time.time() + 10.0  # 10 secondes de délai avant départ
+                print(f"Délai de départ programmé: {self.travel_end_time} (dans 10 secondes)")
                 return "Le héros se dirige à la quête. Départ dans 10s."
             except Exception:
                 return "Erreur: impossible de démarrer le trajet."

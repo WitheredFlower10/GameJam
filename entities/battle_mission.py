@@ -268,6 +268,8 @@ class BattleMission:
         self.boss_max_health = 40
         self.last_boss_shot = 0
         self.success = False
+        self.laser_sound = arcade.load_sound("assets/sounds/laser.wav")
+
         # Le nombre d'ennemis est déjà défini dans __init__
     
     def start_mission(self):
@@ -404,6 +406,8 @@ class BattleMission:
             bullet.change_x = BULLET_SPEED
             self.bullet_list.append(bullet)
             self.last_bullet_shot = time.time()
+            if self.laser_sound:
+                arcade.play_sound(self.laser_sound, volume=0.1)
 
         # Tir des ennemis - chaque ennemi a son propre timing
         current_time = time.time()
