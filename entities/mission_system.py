@@ -16,7 +16,7 @@ class MissionSystem:
         # Système de paris
         self.betting_active = False
         self.bet_amount = 0
-        self.bet_type = None  # "success" ou "failure"
+        self.bet_type = None  # "success" ou "echec"
         self.bet_placed = False
         self.bet_result = None
         
@@ -256,7 +256,7 @@ class MissionSystem:
                 if ship:
                     ship.set_hero_on_mission(True)
                 # Puis démarrer le compte à rebours
-                self.travel_end_time = time.time() + 10.0
+                self.travel_end_time = time.time() + 1  # 10 secondes de délai avant départ
                 return "Le héros se dirige à la quête. Départ dans 10s."
             except Exception:
                 return "Erreur: impossible de démarrer le trajet."
@@ -323,7 +323,7 @@ class MissionSystem:
         if amount > self.gold:
             return "Fonds insuffisants."
         
-        self.bet_type = bet_type  # "success" ou "failure"
+        self.bet_type = bet_type  # "success" ou "echec"
         self.bet_amount = amount
         self.bet_placed = True
         self.betting_active = False
@@ -370,7 +370,7 @@ class MissionSystem:
             self.bet_result['message'] = f"🎉 PARI GAGNÉ ! 🎉\nVous aviez parié sur la RÉUSSITE\nMission de bataille du héros: RÉUSSIE ✅\nGains: +{self.bet_result['winnings']} crédits"
             # Créditer l'or (double du montant misé)
             self.gold += self.bet_result['winnings']
-        elif self.bet_type == "failure" and not mission_success:
+        elif self.bet_type == "echec" and not mission_success:
             # Pari gagné sur l'échec de la MISSION DE BATAILLE
             self.bet_result['won'] = True
             self.bet_result['winnings'] = self.bet_amount * 2
