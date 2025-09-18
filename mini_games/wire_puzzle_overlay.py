@@ -198,9 +198,9 @@ class WirePuzzleOverlay:
     
     def on_draw(self):
         """Dessiner l'overlay"""
-        # Position de l'overlay (en bas à droite comme le terminal)
-        overlay_x = self.window.width - self.width - 30
-        overlay_y = 30
+        # Position de l'overlay (centré horizontalement, légèrement en bas)
+        overlay_x = (self.window.width - self.width) // 2
+        overlay_y = (self.window.height - self.height) // 2 - 80
         
         # Fond de l'overlay
         arcade.draw_lrbt_rectangle_filled(

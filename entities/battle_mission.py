@@ -364,8 +364,8 @@ class BattleMission:
             # Spawn encore 20px plus à gauche (désormais à l'intérieur de l'overlay)
             enemy.center_x = self.overlay_x + self.overlay_w - 20
             enemy.center_y = random.randint(
-                self.overlay_y + 20, 
-                self.overlay_y + self.overlay_h - 20
+                int(self.overlay_y + 20), 
+                int(self.overlay_y + self.overlay_h - 20)
             )
             enemy.change_x = -ENEMY_SPEED
             self.enemy_list.append(enemy)

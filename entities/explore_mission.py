@@ -608,12 +608,12 @@ class ExploreMission:
                     enemy = arcade.Sprite()
                     if self.enemy_texture:
                         enemy.texture = self.enemy_texture
-                        # Ajuster la taille pour que l'ennemi soit bien proportionné
-                        enemy.scale = 0.3  # Ajuster selon la taille de l'image
+                        # Ajuster la taille pour qu'elle soit identique au héros
+                        enemy.scale = 0.6  # Même taille que le héros
                         # Positionner l'ennemi avec les pieds sur le sol/plateforme
                         enemy.center_x = x
-                        enemy.center_y = y + 8  # Ajustement fixe pour les pieds sur le sol
-                        print(f"Ennemi créé avec texture PNG à ({x}, {y + 7})")
+                        enemy.center_y = y + 20  # Ajustement pour le nouveau scale 0.6
+                        print(f"Ennemi créé avec texture PNG à ({x}, {y + 20})")
                     else:
                         # Fallback si la texture n'est pas chargée
                         enemy.texture = arcade.make_soft_square_texture(8, (255, 0, 0), outer_alpha=255)
@@ -648,13 +648,13 @@ class ExploreMission:
                         enemy = arcade.Sprite()
                         if self.enemy_texture:
                             enemy.texture = self.enemy_texture
-                            # Ajuster la taille pour que l'ennemi soit bien proportionné
-                            enemy.scale = 0.3  # Ajuster selon la taille de l'image
+                            # Ajuster la taille pour qu'elle soit identique au héros
+                            enemy.scale = 0.6  # Même taille que le héros
                             # Positionner l'ennemi avec les pieds sur le sol/plateforme
                             enemy.center_x = x
-                            enemy.center_y = y + 8  # Ajustement fixe pour les pieds sur le sol
+                            enemy.center_y = y + 20  # Ajustement pour le nouveau scale 0.6
                             # Ajuster la hitbox pour qu'elle soit touchable 5px plus haut
-                            print(f"Ennemi créé avec texture PNG à ({x}, {y + 7})")
+                            print(f"Ennemi créé avec texture PNG à ({x}, {y + 20})")
                         else:
                             # Fallback si la texture n'est pas chargée
                             enemy.texture = arcade.make_soft_square_texture(8, (255, 0, 0), outer_alpha=255)
