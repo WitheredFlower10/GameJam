@@ -49,6 +49,17 @@ HERO_STATE_FIGHTING = "fighting"
 HERO_STATE_COMPLETED = "completed"
 HERO_STATE_FAILED = "failed"
 
+# Paramètres des étoiles pour le fond spatial
+STAR_COUNT = 200  # Nombre d'étoiles dans le fond
+STAR_MIN_SIZE = 1  # Taille minimale des étoiles
+STAR_MAX_SIZE = 3  # Taille maximale des étoiles
+STAR_COLORS = [
+    (255, 255, 255),  # Blanc
+    (255, 255, 200),  # Blanc jaunâtre
+    (200, 200, 255),  # Blanc bleuté
+    (255, 200, 200),  # Blanc rosâtre
+]  # Différentes couleurs d'étoiles
+
 # Crédits initiaux du joueur
 CREDIT_INITIAL = 20
 
