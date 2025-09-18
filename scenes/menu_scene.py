@@ -2,6 +2,9 @@ import arcade
 import math
 from utils.constants import SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE
 
+# Police terminal commune pour tout le fichier
+FONT_TERMINAL = "ByteBounce"
+
 
 class StarBackgroundMixin:
     """Mixin class pour ajouter un fond étoilé aux scènes"""
@@ -32,12 +35,15 @@ class MenuScene(arcade.View, StarBackgroundMixin):
     def __init__(self):
         super().__init__()
         
-        # Couleurs futuristes
-        self.title_color = (44,86,110)       
-        self.subtitle_color = (180, 180, 255)  
-        self.option_color = (147,150,185)  
-        self.option_hover_color = (85,106,161) 
+        # Palette sobre et desaturee
+        self.title_color = (170, 190, 210)
+        self.subtitle_color = (150, 170, 190)
+        self.option_color = (185, 190, 200)
+        self.option_hover_color = (210, 215, 225)
         self.background_color = arcade.color.BLACK
+        self.font_name = "Starkwalker"
+        self.font_terminal = FONT_TERMINAL
+
         
         #Son
         self.sound_back = arcade.load_sound("assets/sounds/menu_back.wav")
@@ -49,9 +55,9 @@ class MenuScene(arcade.View, StarBackgroundMixin):
         # État du menu
         self.selected_option = 0
         self.menu_options = [
-            "▶ Démarrer l’Opération",
-            "📜 Manuel Galactique",
-            "✖ Éjecter du Système"
+            "Demarrer l'Operation",
+            "Manuel Galactique",
+            "Ejecter du Systeme"
         ]
         
         # Animation
@@ -77,8 +83,8 @@ class MenuScene(arcade.View, StarBackgroundMixin):
             self.title_text = arcade.Text(
                 "The Observer Protocol",
                 screen_w // 2, screen_h - int(screen_h * 0.15),
-                (0, 0, 255), title_size,
-                anchor_x="center", bold=True
+                self.title_color, title_size,
+                anchor_x="center", bold=True, font_name=self.font_terminal
             )
         
             # Sous-titre
@@ -87,24 +93,24 @@ class MenuScene(arcade.View, StarBackgroundMixin):
                 "Centre de Commande Intergalactique",
                 screen_w // 2, screen_h - int(screen_h * 0.25),
                 self.subtitle_color, subtitle_size,
-                anchor_x="center"
+                anchor_x="center", font_name=self.font_terminal
             )
             
-            # Contrôles
+            # Controles
             controls_size = max(16, int(screen_h * 0.025))
             
-            # Texte des contrôles adapté selon l'OS
+            # Texte des controles adapte selon l'OS
             import platform
             if platform.system() == "Darwin":  # macOS
-                controls_text = "Naviguez avec ↑↓  |  Validez avec ENTRÉE"
+                controls_text = "Naviguez avec ↑↓  |  Validez avec ENTREE"
             else:
-                controls_text = "Naviguez avec ↑↓  |  Validez avec ENTRÉE"
+                controls_text = "Naviguez avec ↑↓  |  Validez avec ENTREE"
                 
             self.controls_text = arcade.Text(
                 controls_text,
                 screen_w // 2, int(screen_h * 0.15),
                 (180, 180, 180), controls_size,
-                anchor_x="center"
+                anchor_x="center", font_name=self.font_terminal
             )
             
             # Version du jeu
@@ -112,7 +118,7 @@ class MenuScene(arcade.View, StarBackgroundMixin):
             self.version_text = arcade.Text(
                 "Version 1.0 - Game Jam 2025",
                 10, 10,
-                (150, 150, 150), version_size
+                (150, 150, 150), version_size, font_name=self.font_terminal
             )
             
             # Options du menu (créées dynamiquement)
@@ -138,7 +144,8 @@ class MenuScene(arcade.View, StarBackgroundMixin):
                 self.window.width // 2, 0,  # Position sera mise à jour dans draw_menu_options
                 self.option_color, menu_font_size,
                 anchor_x="center",
-                bold=False
+                bold=False,
+                font_name=self.font_terminal
             )
             self.menu_text_objects.append(text_obj)
     
@@ -218,45 +225,29 @@ class MenuScene(arcade.View, StarBackgroundMixin):
             )
     
     def draw_space_background(self):
-         """ Fond étoilé coloré avec effet galaxie - adapté au fullscreen """
-         screen_w = self.window.width
-         screen_h = self.window.height
-         
-         # Dessiner les étoiles générées depuis le main en premier
-         if hasattr(self.window, 'stars'):
-             for star in self.window.stars:
-                 # Calculer le scintillement
-                 star['twinkle_phase'] += star['twinkle_speed']
-                 twinkle_factor = 0.7 + 0.3 * abs(star['twinkle_phase'] % (2 * 3.14159))
-                 twinkle_alpha = int(star['alpha'] * twinkle_factor)
-                 
-                 # S'assurer que l'alpha reste entre 0 et 255
-                 twinkle_alpha = max(0, min(255, twinkle_alpha))
-                 
-                 # Dessiner l'étoile avec la couleur de base et l'alpha calculé
-                 arcade.draw_circle_filled(
-                     star['x'], 
-                     star['y'], 
-                     star['size'], 
-                     (*star['color'], twinkle_alpha)
-                 )
-         
-         # Créer un dégradé radial pour l'effet galaxie
-         center_x = screen_w // 2
-         center_y = screen_h // 2
-         max_radius = max(screen_w, screen_h)
-         
-         # Dessiner plusieurs cercles avec transparence pour l'effet de nébuleuse
-         for i in range(20):
-             radius = max_radius * (1 - i * 0.05)
-             alpha = int(30 * (1 - i * 0.05))  # Transparence décroissante
-             color = (
-                 min(255, 20 + i * 5),    # Rouge
-                 min(255, 10 + i * 3),    # Vert
-                 min(255, 40 + i * 8),    # Bleu
-                 alpha
-             )
-             arcade.draw_circle_filled(center_x, center_y, radius, color)
+        """ Fond etoile avec effet galaxie sobre - adapte au fullscreen """
+        screen_w = self.window.width
+        screen_h = self.window.height
+        
+        # Degrade radial discret pour une nebuleuse sobre
+        center_x = screen_w // 2
+        center_y = screen_h // 2
+        max_radius = max(screen_w, screen_h)
+        
+        for i in range(18):
+            radius = max_radius * (1 - i * 0.055)
+            alpha = int(26 * (1 - i * 0.055))  # Transparence douce
+            color = (
+                28 + i * 3,   # R
+                36 + i * 4,   # V
+                58 + i * 5,   # B
+                alpha
+            )
+            arcade.draw_circle_filled(center_x, center_y, radius, color)
+        
+        # Effet "scanlines" retro adaptatif
+        for y in range(0, screen_h, 4):
+            arcade.draw_line(0, y, screen_w, y, (0, 0, 0, 40), 1)
     
     def draw_fallback_text(self):
         """Méthode fallback en cas de problème avec les objets Text"""
@@ -266,64 +257,67 @@ class MenuScene(arcade.View, StarBackgroundMixin):
         # Titre avec draw_text classique
         arcade.draw_text("The Observer Protocol", 
                         screen_w // 2, screen_h - int(screen_h * 0.15),
-                        (0, 0, 255), max(54, int(screen_h * 0.08)),
-                        anchor_x="center")
+                        self.title_color, max(54, int(screen_h * 0.08)),
+                        anchor_x="center", font_name=FONT_TERMINAL)
         
         # Sous-titre
         arcade.draw_text("Centre de Commande Intergalactique",
                         screen_w // 2, screen_h - int(screen_h * 0.25),
                         self.subtitle_color, max(20, int(screen_h * 0.03)),
-                        anchor_x="center")
+                        anchor_x="center", font_name=FONT_TERMINAL)
         
-        # Contrôles
+        # Controles
         import platform
         if platform.system() == "Darwin":  # macOS
-            controls_text = "Naviguez avec ↑↓  |  Validez avec ENTRÉE"
+            controls_text = "Naviguez avec ↑↓  |  Validez avec ENTREE"
         else:
-            controls_text = "Naviguez avec ↑↓  |  Validez avec ENTRÉE"
+            controls_text = "Naviguez avec ↑↓  |  Validez avec ENTREE"
             
         arcade.draw_text(controls_text,
                         screen_w // 2, int(screen_h * 0.15),
                         (180, 180, 180), max(16, int(screen_h * 0.025)),
-                        anchor_x="center")
+                        anchor_x="center", font_name=FONT_TERMINAL)
         
         # Version
         arcade.draw_text("Version 1.0 - Game Jam 2025",
-                        10, 10, (150, 150, 150), max(12, int(screen_h * 0.02)))
+                        10, 10, (150, 150, 150), max(12, int(screen_h * 0.02)),
+                        font_name=FONT_TERMINAL)
         
         # Options du menu
-        start_y = screen_h // 2 + int(screen_h * 0.07)
-        option_height = int(screen_h * 0.09)
+        # Organisation plus sobre: espacement et separateur
+        start_y = int(screen_h * 0.58)
+        option_height = int(screen_h * 0.08)
+        
+        # Ligne separatrice discrete au-dessus des options
+        sep_y = start_y + int(screen_h * 0.035)
+        arcade.draw_line(int(screen_w * 0.3), sep_y, int(screen_w * 0.7), sep_y, (80, 80, 120, 120), 1)
         
         for i, option in enumerate(self.menu_options):
             y_pos = start_y - (i * option_height)
             color = self.option_hover_color if i == self.selected_option else self.option_color
             
             arcade.draw_text(option, screen_w // 2, y_pos, color,
-                           max(26, int(screen_h * 0.035)), anchor_x="center")
+                           max(26, int(screen_h * 0.035)), anchor_x="center",
+                           font_name=FONT_TERMINAL)
     
     
     def draw_menu_options(self):
         screen_w = self.window.width
         screen_h = self.window.height
-        start_y = screen_h // 2 + int(screen_h * 0.07)
-        option_height = int(screen_h * 0.09)
+        # Espacement reduit et separateur discret
+        start_y = int(screen_h * 0.56)
+        option_height = int(screen_h * 0.065)
+
+        # Ligne separatrice au-dessus des options
+        sep_y = start_y + int(screen_h * 0.035)
+        arcade.draw_line(int(screen_w * 0.3), sep_y, int(screen_w * 0.7), sep_y, (80, 80, 120, 120), 1)
         
         for i, option in enumerate(self.menu_options):
             y_pos = start_y - (i * option_height)
             
             if i == self.selected_option:
-                # Pulsation néon pour le fond - adaptatif
-                pulse = 150 + 100 * math.sin(self.animation_timer * 0.1)
+                # Style de selection sobre: simple soulignement fin
                 color = self.option_hover_color
-                glow_color = (color[0], color[1], color[2], int(pulse))
-                glow_width = int(screen_w * 0.4)
-                glow_height = int(screen_h * 0.04)
-                arcade.draw_lrbt_rectangle_filled(
-                    screen_w // 2 - glow_width, screen_w // 2 + glow_width,
-                    y_pos - glow_height, y_pos + glow_height,
-                    glow_color
-                )
             else:
                 color = self.option_color
             
@@ -334,6 +328,20 @@ class MenuScene(arcade.View, StarBackgroundMixin):
             text_obj.color = color
             text_obj.bold = (i == self.selected_option)
             text_obj.draw()
+
+            # Dessiner un soulignement discret pour l'option selectionnee
+            if i == self.selected_option:
+                underline_width = int(screen_w * 0.16)
+                underline_y = y_pos - int(screen_h * 0.016)
+                underline_color = (140, 160, 180, 180)
+                arcade.draw_line(
+                    screen_w // 2 - underline_width // 2,
+                    underline_y,
+                    screen_w // 2 + underline_width // 2,
+                    underline_y,
+                    underline_color,
+                    2
+                )
     
     
     def on_key_press(self, key, modifiers):
@@ -402,61 +410,72 @@ class InstructionsView(arcade.View):
         """Crée tous les objets Text pour les instructions"""
         # Titre
         self.title_text = arcade.Text(
-            "📜 MANUEL GALACTIQUE",
+            "MANUEL GALACTIQUE",
             SCREEN_WIDTH // 2, SCREEN_HEIGHT - 100,
             (0, 255, 220), 32,
-            anchor_x="center", bold=True
+            anchor_x="center", bold=True,
+            font_name=FONT_TERMINAL
         )
         
         # Instructions de retour
         self.return_text = arcade.Text(
-            "⟵ ÉCHAP pour retourner au menu",
+            "ECHAP pour retourner au menu",
             SCREEN_WIDTH // 2, 50,
             (180, 180, 180), 16,
-            anchor_x="center"
+            anchor_x="center",
+            font_name=FONT_TERMINAL
         )
         
         self.content_texts = []
         instructions = [
             "Bienvenue Agent ! Voici vos directives :",
             "",
-            "🎯 Votre mission :",
-            "• Donner les quêtes aux héros interstellaires",
+            "Mission :",
+            "• Donner les quetes aux heros interstellaires",
             "• Superviser leur progression depuis la base",
             "• Faire la maintenance du vaisseau",
             "",
-            "🎮 Contrôles :",
-            "• FLÈCHES : Déplacer votre avatar",
+            "Controles :",
+            "• FLECHES : Deplacer votre avatar",
             "• ESPACE : Interagir avec un terminal",
             "",
-            "🛰️ Surveillance :",
-            "• L'écran central affiche la mission en cours",
-            "• Les héros agissent seuls, mais vous pouvez parier sur leur réussite",
+            "Surveillance :",
+            "• L'ecran central affiche la mission en cours",
+            "• Les heros agissent seuls, mais vous pouvez parier sur leur reussite",
             "",
-            "🏆 Objectif final :",
-            "• Accomplir vos tâches pour mieux voir le héros",
-            "• Maximiser la réussite de vos paris",
+            "Objectif final :",
+            "• Accomplir vos taches pour mieux voir le heros",
+            "• Maximiser la reussite de vos paris",
             "• Gagner le plus d'argent possible"
         ]
-        
-        y_pos = SCREEN_HEIGHT - 160
+
+        # Panneau translucide derriere le contenu pour lisibilite
+        self.instructions_panel = {
+            "x": 40,
+            "y": 80,
+            "w": SCREEN_WIDTH - 80,
+            "h": SCREEN_HEIGHT - 240,
+            "color": (10, 15, 25, 120)
+        }
+
+        y_pos = SCREEN_HEIGHT - 180
         for line in instructions:
             if line == "":
-                y_pos -= 15
+                y_pos -= 12
                 continue
             
             color = arcade.color.WHITE
-            size = 16
+            size = 15
             if line.startswith("•"):
-                color = (200, 200, 255)
+                color = (190, 200, 220)
                 size = 14
-            elif line.startswith("🎯") or line.startswith("🎮") or line.startswith("🛰️") or line.startswith("🏆"):
-                color = (255, 200, 0)
-                size = 18
+            elif line.endswith(":") and not line.startswith("•"):
+                color = (200, 215, 235)
+                size = 17
             
-            text_obj = arcade.Text(line, 60, y_pos, color, size)
+            text_obj = arcade.Text(line, 60, y_pos, color, size, font_name=FONT_TERMINAL)
             self.content_texts.append(text_obj)
-            y_pos -= 25
+            y_pos -= 22
     
     def on_draw(self):
         self.clear()
@@ -464,6 +483,10 @@ class InstructionsView(arcade.View):
         # Dessiner tous les textes avec les objets Text (plus performant)
         self.title_text.draw()
         
+        # Panneau translucide de fond
+        p = self.instructions_panel
+        arcade.draw_lrbt_rectangle_filled(p["x"], p["x"] + p["w"], p["y"], p["y"] + p["h"], p["color"])
+
         # Dessiner tout le contenu du manuel
         for text_obj in self.content_texts:
             text_obj.draw()
