@@ -259,6 +259,10 @@ class Ship(arcade.SpriteList):
             if point.get('type') == 'repair_screen_enemies':
                 if not (mission_system and getattr(mission_system, 'missions_completed_success_count', 0) >= 1):
                     continue
+            # Cacher la réparation VIE tant qu'aucune mission n'est lancée
+            if point.get('type') == 'repair_screen_health':
+                if not (mission_system and getattr(mission_system, 'missions_launched_count', 0) >= 1):
+                    continue
             points_to_draw.append(point)
 
         import math

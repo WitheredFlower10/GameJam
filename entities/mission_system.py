@@ -29,6 +29,7 @@ class MissionSystem:
 
         # Ordonnancement des missions
         self.missions_assigned_count = 0
+        self.missions_launched_count = 0  # Compteur de missions lancées (pour déblocages)
 
         self.terminal_on = False
         # Demande d'ouverture du mini-jeu Wire Puzzle
@@ -130,6 +131,7 @@ class MissionSystem:
             # Récompense immédiate de vente de mission
             self.gold += 100
             self.missions_assigned_count += 1
+            self.missions_launched_count += 1  # Incrémenter le compteur de missions lancées
             
             print(f"Mission '{self.current_mission['name']}' assignée au héros!")
     
@@ -158,6 +160,7 @@ class MissionSystem:
                 self.hero.start_mission(mission_template)
             self.gold += 100
             self.missions_assigned_count += 1
+            self.missions_launched_count += 1  # Incrémenter le compteur de missions lancées
             print(f"Mission '{self.current_mission['name']}' assignée au héros après le trajet!")
         
         if self.current_mission:
@@ -262,6 +265,8 @@ class MissionSystem:
                 return "Erreur: impossible de démarrer le trajet."
         elif point_name == "REPARATION / VIE":
             # Lancer le wire puzzle pour débloquer l'affichage de la vie
+            if getattr(self, 'missions_launched_count', 0) < 1:
+                return "Réparation Santé indisponible: lancez d'abord une mission."
             if self.wire_puzzle_completed:
                 return "Réparation Santé déjà effectuée."
             self.wire_puzzle_requested = True

@@ -342,7 +342,8 @@ class MainScene(arcade.View):
             missions_completed = 0
 
         # Faisabilité
-        show_repair_health = True
+        mission_launched = getattr(self.mission_system, 'missions_launched_count', 0) >= 1
+        show_repair_health = mission_launched or repair_health_done  # Disponible dès qu'une mission est lancée
         show_repair_connection = True
         show_repair_enemies = (missions_completed >= 1) or repair_enemies_done
 
