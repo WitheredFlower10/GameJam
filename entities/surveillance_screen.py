@@ -12,7 +12,8 @@ class SurveillanceScreen:
         
         self.screen_x = SURVEILLANCE_SCREEN_X
         self.screen_y = SURVEILLANCE_SCREEN_Y
-        self.screen_width = SURVEILLANCE_SCREEN_WIDTH
+        # +20 px (10 à gauche, 10 à droite) par défaut
+        self.screen_width = SURVEILLANCE_SCREEN_WIDTH + 20
         self.screen_height = SURVEILLANCE_SCREEN_HEIGHT
         
         self.scroll_speed = 20
@@ -57,24 +58,19 @@ class SurveillanceScreen:
                     self.hero.screen_x = 0
     
     def draw(self):
-        # Dessiner le cadre de l'écran
-        arcade.draw_lrbt_rectangle_outline(
-            self.screen_x,
-            self.screen_x + self.screen_width,
-            self.screen_y,
-            self.screen_y + self.screen_height,
-            arcade.color.WHITE,
-            3
-        )
+        # Dessiner l'arrière-plan de l'écran (fond)
+        left = self.screen_x
+        right = self.screen_x + self.screen_width
+        bottom = self.screen_y
+        top = self.screen_y + self.screen_height
+        arcade.draw_lrbt_rectangle_filled(left, right, bottom, top, SCREEN_COLOR)
         
-        # Dessiner l'arrière-plan de l'écran
-        arcade.draw_lrbt_rectangle_filled(
-            self.screen_x,
-            self.screen_x + self.screen_width,
-            self.screen_y,
-            self.screen_y + self.screen_height,
-            SCREEN_COLOR
-        )
+        # Cadre/bords plus épais et plus esthétiques (double contour)
+        # Contour extérieur légèrement gris, épaisseur 5 px
+        arcade.draw_lrbt_rectangle_outline(left, right, bottom, top, arcade.color.LIGHT_GRAY, 5)
+        # Contour intérieur blanc, légèrement en retrait, épaisseur 2 px
+        inset = 4
+        arcade.draw_lrbt_rectangle_outline(left + inset, right - inset, bottom + inset, top - inset, arcade.color.WHITE, 2)
         
         # Dessiner la mission active (bataille ou exploration)
         if self.hero and self.hero.battle_mission:
@@ -120,11 +116,15 @@ class SurveillanceScreen:
         # Barre de vie
         arcade.draw_text("Vie:", info_x, info_y, arcade.color.WHITE, 12)
         health_width = (self.hero.get_health_percentage() / 100) * 100
+        # Positionner la barre bien à l'intérieur de l'écran (éviter de dépasser à gauche)
+        bar_left = self.screen_x + 10
+        bar_right_max = bar_left + 100
+        fill_right = bar_left + max(0, min(100, health_width))
         arcade.draw_lrbt_rectangle_filled(
-            info_x - 20, info_x - 20 + health_width, info_y - 10, info_y, arcade.color.GREEN
+            bar_left, fill_right, info_y - 10, info_y, arcade.color.GREEN
         )
         arcade.draw_lrbt_rectangle_outline(
-            info_x - 20, info_x + 80, info_y - 10, info_y, arcade.color.WHITE
+            bar_left, bar_right_max, info_y - 10, info_y, arcade.color.WHITE
         )
         
         # État du héros

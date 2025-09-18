@@ -72,9 +72,9 @@ class MenuScene(arcade.View):
             # Texte des contrôles adapté selon l'OS
             import platform
             if platform.system() == "Darwin":  # macOS
-                controls_text = "Naviguez avec ↑↓  |  Validez avec ENTRÉE  |  Cmd+F: Fullscreen (menu uniquement)"
+                controls_text = "Naviguez avec ↑↓  |  Validez avec ENTRÉE"
             else:
-                controls_text = "Naviguez avec ↑↓  |  Validez avec ENTRÉE  |  F11: Fullscreen (menu uniquement)"
+                controls_text = "Naviguez avec ↑↓  |  Validez avec ENTRÉE"
                 
             self.controls_text = arcade.Text(
                 controls_text,
@@ -233,9 +233,9 @@ class MenuScene(arcade.View):
         # Contrôles
         import platform
         if platform.system() == "Darwin":  # macOS
-            controls_text = "Naviguez avec ↑↓  |  Validez avec ENTRÉE  |  Cmd+F: Fullscreen (menu uniquement)"
+            controls_text = "Naviguez avec ↑↓  |  Validez avec ENTRÉE"
         else:
-            controls_text = "Naviguez avec ↑↓  |  Validez avec ENTRÉE  |  F11: Fullscreen (menu uniquement)"
+            controls_text = "Naviguez avec ↑↓  |  Validez avec ENTRÉE"
             
         arcade.draw_text(controls_text,
                         screen_w // 2, int(screen_h * 0.15),
@@ -306,10 +306,6 @@ class MenuScene(arcade.View):
         if self.selected_option == 0:  # Démarrer l'Opération
             # Arrêter la musique de fond
             self.stop_background_music()
-            
-            # Désactiver le toggle fullscreen
-            if hasattr(self.window, 'disable_fullscreen_toggle'):
-                self.window.disable_fullscreen_toggle()
             
             # Lancer le jeu principal
             from scenes.main_scene import MainScene

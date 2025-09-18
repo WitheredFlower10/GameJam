@@ -53,6 +53,7 @@ class Agent(arcade.Sprite):
         # Systèmes liés
         self.mission_system = None
         self.current_interaction = None
+        self.collision_list = None  # Liste des sprites avec lesquels on peut collider
         
         # Contrôles
         self.left_pressed = False
@@ -67,6 +68,34 @@ class Agent(arcade.Sprite):
     
     def set_mission_system(self, mission_system):
         self.mission_system = mission_system
+        try:
+            # Donner une référence de l'agent au mission system (pour les distances)
+            setattr(self.mission_system, 'agent_ref', self)
+        except Exception:
+            pass
+    
+    def set_collision_list(self, collision_list):
+        self.collision_list = collision_list
+    
+    def _can_move_to(self, new_x):
+        """Vérifie si l'agent peut se déplacer à la position new_x sans collision"""
+        if not self.collision_list:
+            return True
+            
+        # Sauvegarder la position actuelle
+        old_x = self.center_x
+        
+        # Tester la nouvelle position
+        self.center_x = new_x
+        
+        # Vérifier les collisions
+        collisions = arcade.check_for_collision_with_list(self, self.collision_list)
+        
+        # Restaurer la position
+        self.center_x = old_x
+        
+        # Pas de collision = peut se déplacer
+        return len(collisions) == 0
     
     def update(self, delta_time):
         super().update()
@@ -84,13 +113,23 @@ class Agent(arcade.Sprite):
         self.change_x = 0
         
         if self.left_pressed and not self.right_pressed:
-            self.change_x = -self.speed
-            self.state = AGENT_STATE_MOVING
-            self.facing = 'left'
+            new_x = self.center_x - self.speed
+            if self._can_move_to(new_x):
+                self.change_x = -self.speed
+                self.state = AGENT_STATE_MOVING
+                self.facing = 'left'
+            else:
+                self.change_x = 0
+                self.state = AGENT_STATE_IDLE
         elif self.right_pressed and not self.left_pressed:
-            self.change_x = self.speed
-            self.state = AGENT_STATE_MOVING
-            self.facing = 'right'
+            new_x = self.center_x + self.speed
+            if self._can_move_to(new_x):
+                self.change_x = self.speed
+                self.state = AGENT_STATE_MOVING
+                self.facing = 'right'
+            else:
+                self.change_x = 0
+                self.state = AGENT_STATE_IDLE
         else:
             self.state = AGENT_STATE_IDLE
         
@@ -266,16 +305,25 @@ class Agent(arcade.Sprite):
     def check_interactions(self):
         # Vérifier s'il y a des points d'interaction à proximité
         if self.mission_system:
+            # Récupérer les interactions X-only unifiées
             nearby_interactions = self.mission_system.get_nearby_interactions(self.center_x)
+            
             if nearby_interactions and self.interact_pressed:
-                # Interagir avec le point le plus proche
-                closest = min(nearby_interactions, key=lambda x: abs(x['x'] - self.center_x))
+                # Interagir avec le point le plus proche (X uniquement)
+                def _dist_x(p):
+                    try:
+                        return abs(float(p.get('x', 0)) - float(self.center_x))
+                    except Exception:
+                        return 1e9
+                closest = min(nearby_interactions, key=_dist_x)
                 self.interact_with_point(closest)
     
     def interact_with_point(self, interaction_point):
         # Utiliser le système de missions pour gérer l'interaction
         if self.mission_system:
-            result = self.mission_system.interact_with_point(interaction_point['name'])
+            # Essayer d'obtenir le ship depuis le mission_system si disponible
+            ship = getattr(self.mission_system, 'ship', None)
+            result = self.mission_system.interact_with_point(interaction_point['name'], ship)
             print(f"Interaction avec {interaction_point['name']}: {result}")
             self.interact_pressed = False
     

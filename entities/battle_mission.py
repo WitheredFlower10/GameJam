@@ -71,6 +71,11 @@ class BattleMission:
         self.last_boss_shot = 0
         # Résultat
         self.success = False
+        # Bounds of the surveillance overlay (can be updated by the scene)
+        self.overlay_x = SURVEILLANCE_SCREEN_X
+        self.overlay_y = SURVEILLANCE_SCREEN_Y
+        self.overlay_w = SURVEILLANCE_SCREEN_WIDTH + 20
+        self.overlay_h = SURVEILLANCE_SCREEN_HEIGHT
     
     def setup_battle(self):
         """Initialisation du jeu"""
@@ -84,8 +89,8 @@ class BattleMission:
 
         # Héros de la mission (utilise l'instance Hero passée)
         self.player_sprite = self.hero
-        self.player_sprite.center_x = SURVEILLANCE_SCREEN_X + 60
-        self.player_sprite.center_y = SURVEILLANCE_SCREEN_Y + SURVEILLANCE_SCREEN_HEIGHT // 2
+        self.player_sprite.center_x = self.overlay_x + 60
+        self.player_sprite.center_y = self.overlay_y + self.overlay_h // 2
         self.player_list.append(self.player_sprite)
         
         self.last_enemy_spawn = 0
@@ -127,10 +132,11 @@ class BattleMission:
         # Spawn d'ennemis (désactivé quand le boss est présent)
         if (not self.boss_active) and (time.time() - self.last_enemy_spawn > SPAWN_INTERVAL):
             enemy = arcade.SpriteSolidColor(30, 30, arcade.color.RED)
-            enemy.center_x = SURVEILLANCE_SCREEN_X + SURVEILLANCE_SCREEN_WIDTH + 20
+            # Spawn encore 20px plus à gauche (désormais à l'intérieur de l'overlay)
+            enemy.center_x = self.overlay_x + self.overlay_w - 20
             enemy.center_y = random.randint(
-                SURVEILLANCE_SCREEN_Y + 20, 
-                SURVEILLANCE_SCREEN_Y + SURVEILLANCE_SCREEN_HEIGHT - 20
+                self.overlay_y + 20, 
+                self.overlay_y + self.overlay_h - 20
             )
             enemy.change_x = -ENEMY_SPEED
             self.enemy_list.append(enemy)
@@ -190,17 +196,21 @@ class BattleMission:
         self.explosion_list.update()
 
         # Supprimer ennemis/bullets hors écran
-        for enemy in self.enemy_list:
-            if enemy.center_x < SURVEILLANCE_SCREEN_X - 20:
+        for enemy in list(self.enemy_list):
+            # Despawn encore 20px plus à droite (à l'intérieur de l'overlay)
+            if enemy.center_x < self.overlay_x + 20:
                 enemy.remove_from_sprite_lists()
-        for bullet in self.bullet_list:
-            if bullet.center_x > SURVEILLANCE_SCREEN_X + SURVEILLANCE_SCREEN_WIDTH + 20:
+        for bullet in list(self.bullet_list):
+            # Hero bullets (right-moving) despawn 20px before the right edge
+            if bullet.center_x > self.overlay_x + self.overlay_w - 20:
                 bullet.remove_from_sprite_lists()
-        for enemy_bullet in self.enemy_bullet_list:
-            if enemy_bullet.center_x < SURVEILLANCE_SCREEN_X - 20:
+        for enemy_bullet in list(self.enemy_bullet_list):
+            # Enemy bullets (left-moving) despawn 20px after the left edge
+            if enemy_bullet.center_x < self.overlay_x + 20:
                 enemy_bullet.remove_from_sprite_lists()
-        for boss_bullet in self.boss_bullet_list:
-            if boss_bullet.center_x < SURVEILLANCE_SCREEN_X - 20:
+        for boss_bullet in list(self.boss_bullet_list):
+            # Boss bullets (left-moving) despawn 20px after the left edge
+            if boss_bullet.center_x < self.overlay_x + 20:
                 boss_bullet.remove_from_sprite_lists()
 
         # Collision balles/ennemis
@@ -308,10 +318,10 @@ class BattleMission:
         self.player_sprite.center_y += self.hero_direction_y * self.hero_speed
         
         # Limites de l'écran de surveillance (côté gauche seulement)
-        screen_left = SURVEILLANCE_SCREEN_X + 20
-        screen_right = SURVEILLANCE_SCREEN_X + SURVEILLANCE_SCREEN_WIDTH // 2  # Moitié gauche seulement
-        screen_bottom = SURVEILLANCE_SCREEN_Y + 20
-        screen_top = SURVEILLANCE_SCREEN_Y + SURVEILLANCE_SCREEN_HEIGHT - 20
+        screen_left = self.overlay_x + 20
+        screen_right = self.overlay_x + self.overlay_w // 2  # Moitié gauche seulement
+        screen_bottom = self.overlay_y + 20
+        screen_top = self.overlay_y + self.overlay_h - 20
         
         # Inverser la direction aux bords
         if self.player_sprite.center_x <= screen_left or self.player_sprite.center_x >= screen_right:
@@ -344,21 +354,22 @@ class BattleMission:
             print(f"Affichage de {len(self.explosion_list)} explosion(s)")
         self.explosion_list.draw()
         
-        # Barre de vie du boss
+        # Barre de vie du boss (clamp pour éviter de dépasser l'overlay)
         if self.boss_active and self.boss_sprite is not None:
             bar_width = 140
             bar_height = 10
             ratio = 0 if self.boss_max_health == 0 else max(0, min(1, self.boss_health / self.boss_max_health))
             bar_center_x = self.boss_sprite.center_x
             bar_center_y = self.boss_sprite.center_y + self.boss_sprite.height // 2 + 16
-            left = bar_center_x - bar_width / 2
-            right = bar_center_x + bar_width / 2
+            left = max(self.overlay_x + 8, bar_center_x - bar_width / 2)
+            right = min(self.overlay_x + self.overlay_w - 8, bar_center_x + bar_width / 2)
             bottom = bar_center_y - bar_height / 2
             top = bar_center_y + bar_height / 2
             # Fond
             arcade.draw_lrbt_rectangle_filled(left, right, bottom, top, arcade.color.DARK_GRAY)
             # Remplissage
-            fill_right = left + (bar_width * ratio)
+            effective_width = right - left
+            fill_right = left + (effective_width * ratio)
             arcade.draw_lrbt_rectangle_filled(left, fill_right, bottom, top, arcade.color.GREEN)
             # Contour
             arcade.draw_lrbt_rectangle_outline(left, right, bottom, top, arcade.color.WHITE)
@@ -366,8 +377,8 @@ class BattleMission:
     def spawn_boss(self):
         # Créer un grand ennemi fixe sur la droite
         self.boss_sprite = arcade.SpriteSolidColor(100, 240, arcade.color.DARK_RED)
-        self.boss_sprite.center_x = SURVEILLANCE_SCREEN_X + SURVEILLANCE_SCREEN_WIDTH - 60
-        self.boss_sprite.center_y = SURVEILLANCE_SCREEN_Y + SURVEILLANCE_SCREEN_HEIGHT // 2
+        self.boss_sprite.center_x = self.overlay_x + self.overlay_w - 60
+        self.boss_sprite.center_y = self.overlay_y + self.overlay_h // 2
         self.boss_list.append(self.boss_sprite)
         self.boss_active = True
     
@@ -379,3 +390,39 @@ class BattleMission:
         else:
             remaining_time = max(0, self.mission_duration - (time.time() - self.start_time))
             return f"En cours - {int(remaining_time)}s restantes"
+
+    def set_screen_bounds(self, x, y, w, h):
+        # Update overlay bounds so mission content follows the overlay
+        dx = x - getattr(self, 'overlay_x', x)
+        dy = y - getattr(self, 'overlay_y', y)
+        self.overlay_x = x
+        self.overlay_y = y
+        self.overlay_w = w
+        self.overlay_h = h
+        # Translate existing sprites so they stay aligned with the overlay
+        def shift_list(sprite_list, dx, dy):
+            if sprite_list:
+                for s in list(sprite_list):
+                    try:
+                        s.center_x += dx
+                        s.center_y += dy
+                    except Exception:
+                        pass
+        # Shift all mission entities
+        if self.player_sprite is not None:
+            try:
+                self.player_sprite.center_x += dx
+                self.player_sprite.center_y += dy
+            except Exception:
+                pass
+        shift_list(self.enemy_list, dx, dy)
+        shift_list(self.bullet_list, dx, dy)
+        shift_list(self.enemy_bullet_list, dx, dy)
+        shift_list(self.boss_bullet_list, dx, dy)
+        shift_list(self.explosion_list, dx, dy)
+        if self.boss_sprite is not None:
+            try:
+                self.boss_sprite.center_x += dx
+                self.boss_sprite.center_y += dy
+            except Exception:
+                pass

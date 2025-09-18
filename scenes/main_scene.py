@@ -5,6 +5,7 @@ from entities.hero import Hero
 from entities.ship import Ship
 from entities.mission_system import MissionSystem
 from entities.surveillance_screen import SurveillanceScreen
+from mini_games.wire_puzzle_overlay import WirePuzzleOverlay
 
 from mini_games.terminal import MainTerminal
 
@@ -26,6 +27,9 @@ class MainScene(arcade.View):
         # SpriteLists pour le dessin
         self.agent_list = None
         self.hero_list = None
+        
+        # SpriteLists pour les collisions
+        self.collision_list = None
         
         # Caméras
         self.camera = None
@@ -79,7 +83,8 @@ class MainScene(arcade.View):
         if self.surveillance_screen:
             # Adapter la taille de l'écran de surveillance à la nouvelle résolution
             screen_scale = min(width / 1024, height / 768)  # Échelle basée sur 1024x768
-            self.surveillance_screen.screen_width = int(400 * screen_scale)
+            # +20 px (10 à gauche, 10 à droite)
+            self.surveillance_screen.screen_width = int(400 * screen_scale) + 20
             self.surveillance_screen.screen_height = int(300 * screen_scale)
             self.surveillance_screen.screen_x = int(50 * screen_scale)
             self.surveillance_screen.screen_y = int(200 * screen_scale)
@@ -103,6 +108,7 @@ class MainScene(arcade.View):
         # Initialiser les SpriteLists
         self.agent_list = arcade.SpriteList()
         self.hero_list = arcade.SpriteList()
+        self.collision_list = arcade.SpriteList()
         
         # Initialiser les entités
         self.agent = Agent()
@@ -112,6 +118,10 @@ class MainScene(arcade.View):
         self.hero_list.append(self.hero)
         
         self.ship = Ship()
+        
+        # Ajouter le HeroNPC aux collisions
+        if self.ship.hero_npc:
+            self.collision_list.append(self.ship.hero_npc)
         self.mission_system = MissionSystem()
         self.surveillance_screen = SurveillanceScreen()
         
@@ -136,9 +146,11 @@ class MainScene(arcade.View):
         self.mission_system.set_hero(self.hero)
         self.surveillance_screen.set_hero(self.hero)
         self.agent.set_mission_system(self.mission_system)
+        self.agent.set_collision_list(self.collision_list)
         
         # Passer les points d'interaction du vaisseau au système de missions
         self.mission_system.set_ship_interaction_points(self.ship.get_interaction_points())
+        self.mission_system.set_ship(self.ship)
 
 
 
@@ -215,18 +227,19 @@ class MainScene(arcade.View):
         self.camera.use()
         self.draw_background()
         self.ship.draw()
+        
+        # Dessiner le héros NPC
+        self.ship.draw_hero_npc(self.mission_system)
+        
         # Utiliser la caméra et la taille d'écran pour afficher correctement les flèches
-        self.ship.draw_interaction_points(self.camera, self.ui_width, self.ui_height)
+        self.ship.draw_interaction_points(self.camera, self.ui_width, self.ui_height, self.mission_system)
 
         # Dessiner les sprites
         self.agent_list.draw()
 
-        # Dessiner l'écran de surveillance seulement si une mission est active
-        if self.mission_system.current_mission:
-            self.surveillance_screen.draw()
-            # Marquer que l'écran était affiché
-            self.surveillance_was_displayed = True
-        else:
+        # Marquer si l'écran de surveillance doit être affiché (le dessin se fait en couche GUI)
+        should_draw_surveillance = bool(self.mission_system.current_mission)
+        if not should_draw_surveillance:
             # L'écran n'est plus affiché - la mission est terminée
             if hasattr(self, 'surveillance_was_displayed') and self.surveillance_was_displayed:
                 self.surveillance_was_displayed = False
@@ -237,6 +250,22 @@ class MainScene(arcade.View):
 
         # Interface utilisateur
         self.gui_camera.use()
+
+        # Dessiner l'écran de surveillance en coordonnées écran et le faire suivre l'agent
+        if should_draw_surveillance:
+            self._update_surveillance_screen_position()
+            # Synchroniser les missions du héros avec la position/tailles de l'écran de surveillance
+            self._sync_mission_overlay_bounds()
+            # Si une mission démarre à cette frame, s'assurer que le contenu apparaît déjà au bon endroit
+            # (la méthode set_screen_bounds translate déjà les sprites existants)
+            self.surveillance_screen.draw()
+            # Marquer que l'écran était affiché (pour la logique de résultat de pari)
+            self.surveillance_was_displayed = True
+
+        # Dessiner le Wire Puzzle en overlay s'il est actif
+        if hasattr(self, 'wire_overlay') and self.wire_overlay is not None:
+            self.wire_overlay.on_draw()
+
         self.draw_floating_message()
         self.draw_ui()
 
@@ -291,6 +320,50 @@ class MainScene(arcade.View):
         # Bouton retour au menu
         arcade.draw_text("ÉCHAP: Retour au menu", 
                         self.ui_width - 200, 30, arcade.color.LIGHT_GRAY, 12)
+
+    def _update_surveillance_screen_position(self):
+        # Convertir la position monde de l'agent en coordonnées écran (Camera2D centrée)
+        screen_w = self.window.width
+        screen_h = self.window.height
+        zoom = getattr(self, 'camera_zoom', 1.0) or 1.0
+        try:
+            cam_x, cam_y = self.camera.position
+        except Exception:
+            cam_x, cam_y = (self.agent.center_x, self.agent.center_y)
+
+        agent_x = self.agent.center_x
+        agent_y = self.agent.center_y
+
+        screen_x = int((agent_x - cam_x) * zoom + (screen_w / 2))
+        screen_y = int((agent_y - cam_y) * zoom + (screen_h / 2))
+
+        # Positionner l'écran de surveillance au-dessus de l'agent
+        offset_y = 350
+        padding_x = 32  # plus de marge gauche/droite
+        padding_y = 12  # marge verticale identique
+        desired_x = screen_x - (self.surveillance_screen.screen_width // 2)
+        desired_y = screen_y + offset_y
+
+        # Conserver l'écran dans les bornes de l'écran
+        max_x = screen_w - self.surveillance_screen.screen_width - padding_x
+        max_y = screen_h - self.surveillance_screen.screen_height - padding_y
+        self.surveillance_screen.screen_x = max(padding_x, min(max_x, desired_x))
+        self.surveillance_screen.screen_y = max(padding_y, min(max_y, desired_y))
+
+    def _sync_mission_overlay_bounds(self):
+        # Propager les bornes actuelles de l'écran de surveillance aux missions actives
+        screen_x = self.surveillance_screen.screen_x
+        screen_y = self.surveillance_screen.screen_y
+        screen_w = self.surveillance_screen.screen_width
+        screen_h = self.surveillance_screen.screen_height
+        if self.hero and self.hero.battle_mission:
+            bm = self.hero.battle_mission
+            if hasattr(bm, 'set_screen_bounds'):
+                bm.set_screen_bounds(screen_x, screen_y, screen_w, screen_h)
+        if self.hero and getattr(self.hero, 'explore_mission', None):
+            em = self.hero.explore_mission
+            if hasattr(em, 'set_screen_bounds'):
+                em.set_screen_bounds(screen_x, screen_y, screen_w, screen_h)
     
     def draw_floating_message(self):
         # Dessiner un message flottant centré (en coordonnées écran/GUI)
@@ -400,13 +473,7 @@ class MainScene(arcade.View):
             SCREEN_WIDTH // 2, SCREEN_HEIGHT - 200,
             arcade.color.GREEN, 16, anchor_x="center"
         )
-        
-        arcade.draw_text(
-            f"Endurance: {betting_info['hero_stamina']:.1f}%",
-            SCREEN_WIDTH // 2, SCREEN_HEIGHT - 220,
-            arcade.color.BLUE, 16, anchor_x="center"
-        )
-        
+
         # Options de pari
         arcade.draw_text(
             "Sur quoi voulez-vous parier ?",
@@ -521,8 +588,11 @@ class MainScene(arcade.View):
         if self.game_state == GAME_STATE_PLAYING:
             self.agent.update(delta_time)
             self.hero.update(delta_time)
-            self.mission_system.update(delta_time)
+            self.mission_system.update(delta_time, self.ship)
             self.surveillance_screen.update(delta_time)
+            
+            # Mettre à jour l'animation du héros NPC
+            self.ship.update_hero_npc(delta_time)
             
             # Mettre à jour les SpriteLists
             self.agent_list.update()
@@ -574,6 +644,13 @@ class MainScene(arcade.View):
                 # L'écran de surveillance s'est fermé - la mission est terminée
                 self.mission_system.calculate_bet_result()
                 print("Résultat du pari calculé - Écran de surveillance fermé (détection update) !")
+
+            # Lancer le mini-jeu Wire Puzzle si demandé (overlay)
+            if getattr(self.mission_system, 'wire_puzzle_requested', False):
+                self.mission_system.wire_puzzle_requested = False
+                def _on_complete():
+                    self.wire_overlay = None
+                self.wire_overlay = WirePuzzleOverlay(self.window, on_exit_callback=_on_complete, mission_system=self.mission_system)
 
             # Mettre à jour la caméra APRÈS toutes les mises à jour
             self.update_camera()
@@ -638,13 +715,13 @@ class MainScene(arcade.View):
             pass
     
     def on_key_press(self, key, modifiers):
+        if hasattr(self, 'wire_overlay') and self.wire_overlay is not None:
+            self.wire_overlay.on_key_press(key, modifiers)
+            return
         if self.terminal:
             self.terminal.on_key_press(key, modifiers)
             return
         if key == arcade.key.ESCAPE:
-            # Réactiver le toggle fullscreen
-            if hasattr(self.window, 'enable_fullscreen_toggle'):
-                self.window.enable_fullscreen_toggle()
             
             # Retour au menu
             from scenes.menu_scene import MenuScene

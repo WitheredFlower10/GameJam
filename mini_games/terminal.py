@@ -1,10 +1,11 @@
 import random
 import arcade
+import time
 
 MENU_OPTIONS = [
     "Connecter a l'ecran",
-    "Chat du futur ($20 chaque fois)",
-    "Achat des infos($200)",
+    "Chat du futur ($10)",
+    "Achat des infos($50)",
     "Exit Terminal"
     
 ]
@@ -18,6 +19,9 @@ class MainTerminal:
         self.font_terminal = "ByteBounce"
         self.screen_connected = screen_connected
         self.gold = gold
+        # Anti-repeat for navigation to avoid skipping items on key auto-repeat
+        self._nav_cooldown_seconds = 0.15
+        self._last_nav_time = 0.0
     # Sous-état : None (menu principal), 'fortune', 'repair', 'info'
         self.sub_view = None
     # État pour l'affichage des informations achetées
@@ -146,7 +150,14 @@ class MainTerminal:
             return
 
         max_index = len(self.menu_options) - 1
-        if key == arcade.key.UP:
+        # Debounce navigation keys to prevent skipping entries due to key repeat
+        if key in (arcade.key.UP, arcade.key.W, arcade.key.Z, arcade.key.DOWN, arcade.key.S):
+            now = time.time()
+            # Use getattr for safety if constructed before attributes exist
+            if (now - getattr(self, '_last_nav_time', 0.0)) < getattr(self, '_nav_cooldown_seconds', 0.15):
+                return
+            self._last_nav_time = now
+        if key in (arcade.key.UP, arcade.key.W, arcade.key.Z):
             prev = self.selected_index
             while True:
                 self.selected_index = (self.selected_index - 1) % (max_index + 1)
@@ -154,7 +165,7 @@ class MainTerminal:
                     break
                 if self.selected_index == prev:
                     break
-        elif key == arcade.key.DOWN:
+        elif key in (arcade.key.DOWN, arcade.key.S):
             prev = self.selected_index
             while True:
                 self.selected_index = (self.selected_index + 1) % (max_index + 1)
@@ -162,7 +173,7 @@ class MainTerminal:
                     break
                 if self.selected_index == prev:
                     break
-        elif key in (arcade.key.ENTER, arcade.key.RETURN):
+        elif key in (arcade.key.ENTER, arcade.key.RETURN, arcade.key.SPACE, arcade.key.F):
             # Si le dernier élément (Exit Terminal) est sélectionné, fermer le terminal
             if self.selected_index == max_index:
                 if self.on_exit_callback:
@@ -177,7 +188,7 @@ class MainTerminal:
                     if self.gold is not None and self.gold < 20:
                         self.show_insufficient_funds()
                         return
-                    self.gold -= 20
+                    self.gold -= 10
                     self._reset_fortune()
                     self.sub_view = 'fortune'
                 # Ouvrir l'écran de réparation
@@ -186,10 +197,10 @@ class MainTerminal:
                     self.sub_view = 'repair'
                 # Ouvrir l'affichage des informations achetées
                 elif self.menu_options[self.selected_index].startswith("Achat des infos"):
-                    if self.gold is not None and self.gold < 200:
+                    if self.gold is not None and self.gold < 50:
                         self.show_insufficient_funds()
                         return
-                    self.gold -= 200
+                    self.gold -= 50
                     self._reset_info()
                     self.sub_view = 'info'
                 elif self.on_select_callback:
@@ -246,7 +257,7 @@ class MainTerminal:
         # initialisation
         if not state['lines']:
             state['current_question'] = random.choice(state['question_list'])
-            state['lines'].append(("bot", "Bienvenue sur FUTUREBOT. Je vais vous poser une question sur la force de l'ennemi ou de votre héros..."))
+            state['lines'].append(("bot", "Bienvenue sur FUTUREBOT. Je vais vous poser une question, repondez et vous aurez peut etre une information importante..."))
             state['lines'].append(("bot", state['current_question']))
         # Dessin
         arcade.draw_lrbt_rectangle_filled(x, x+w, y, y+h, (0, 0, 0, 230))
@@ -274,10 +285,10 @@ class MainTerminal:
         if state['state'] == "asking":
             if key == arcade.key.BACKSPACE:
                 state['input_text'] = state['input_text'][:-1]
-            elif key in (arcade.key.ENTER, arcade.key.RETURN):
+            elif key in (arcade.key.ENTER, arcade.key.RETURN, arcade.key.SPACE, arcade.key.F):
                 self._fortune_commit_answer()
         elif state['state'] == "finished":
-            if key in (arcade.key.ENTER, arcade.key.RETURN):
+            if key in (arcade.key.ENTER, arcade.key.RETURN, arcade.key.SPACE, arcade.key.F):
                 self.sub_view = None
 
     def _fortune_on_text(self, text):
@@ -352,12 +363,12 @@ class MainTerminal:
         if state['state'] == "guessing":
             if key == arcade.key.BACKSPACE:
                 state['input_letter'] = ""
-            elif key in (arcade.key.ENTER, arcade.key.RETURN):
+            elif key in (arcade.key.ENTER, arcade.key.RETURN, arcade.key.SPACE, arcade.key.F):
                 self._repair_commit_letter_guess()
             elif arcade.key.A <= key <= arcade.key.Z:
                 state['input_letter'] = chr(key).upper()
         elif state['state'] in ("finished", "failed"):
-            if key in (arcade.key.ENTER, arcade.key.RETURN):
+            if key in (arcade.key.ENTER, arcade.key.RETURN, arcade.key.SPACE, arcade.key.F):
                 self.sub_view = None
 
     def _repair_on_text(self, text):

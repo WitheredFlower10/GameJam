@@ -1,6 +1,7 @@
 import arcade
 import random
 import time
+import os
 from utils.constants import (
     SURVEILLANCE_SCREEN_WIDTH, SURVEILLANCE_SCREEN_HEIGHT, SURVEILLANCE_SCREEN_X, SURVEILLANCE_SCREEN_Y,
     BULLET_SPEED,
@@ -28,15 +29,31 @@ class ExploreMission:
         self.move_speed = 0.7
         self.jump_strength = 8.0
         
+        # Animation système pour le héros
+        self.hero_walk_textures = []
+        self.hero_animation_index = 0
+        self.hero_animation_timer = 0.0
+        self.hero_animation_speed = 0.3  # secondes par frame
+        self.hero_is_moving = False
+        self.hero_was_moving = False
+        self.hero_on_platform = False  # Indique si le héros est sur une plateforme
+        self.hero_platform_level = 0  # Niveau de la plateforme actuelle
+        self._load_hero_textures()
+        
         # Système de hauteurs standardisées (divisé par 2) avec plus de niveaux
         self.jump_height = 25  # Hauteur qu'un saut peut atteindre (en pixels)
+        # Overlay bounds (can be updated by the scene)
+        self.overlay_x = SURVEILLANCE_SCREEN_X
+        self.overlay_y = SURVEILLANCE_SCREEN_Y
+        self.overlay_w = SURVEILLANCE_SCREEN_WIDTH + 20
+        self.overlay_h = SURVEILLANCE_SCREEN_HEIGHT
         self.platform_levels = [
-            SURVEILLANCE_SCREEN_Y + 15,  # Niveau sol (0)
-            SURVEILLANCE_SCREEN_Y + 15 + self.jump_height,  # Niveau 1
-            SURVEILLANCE_SCREEN_Y + 15 + self.jump_height * 2,  # Niveau 2
-            SURVEILLANCE_SCREEN_Y + 15 + self.jump_height * 3,  # Niveau 3
-            SURVEILLANCE_SCREEN_Y + 15 + self.jump_height * 4,  # Niveau 4
-            SURVEILLANCE_SCREEN_Y + 15 + self.jump_height * 5,  # Niveau 5
+            self.overlay_y + 15,  # Niveau sol (0)
+            self.overlay_y + 15 + self.jump_height,  # Niveau 1
+            self.overlay_y + 15 + self.jump_height * 2,  # Niveau 2
+            self.overlay_y + 15 + self.jump_height * 3,  # Niveau 3
+            self.overlay_y + 15 + self.jump_height * 4,  # Niveau 4
+            self.overlay_y + 15 + self.jump_height * 5,  # Niveau 5
         ]
         self.last_shot_time = 0
         self.last_enemy_shot = 0  # Pour les tirs d'ennemis
@@ -44,8 +61,51 @@ class ExploreMission:
         
         # Système de téléportation et patterns
         self.pattern_generated = False
-        self.artifact_chance = 2  # 5% de chance d'apparition d'artefact
+        self.artifact_chance = 0.05 # 5% de chance d'apparition d'artefact
         self.evaluated_platforms = set()  # Plateformes déjà évaluées pour le saut
+        self.min_enemy_spacing = 30
+
+        self.start_mission()
+    
+    def _get_hero_dimensions(self):
+        """Retourne les dimensions réelles du héros (largeur, hauteur) - taille fixe pour la consistance"""
+        # Utiliser une taille fixe basée sur la première frame d'animation pour éviter les changements constants
+        if self.hero_walk_textures and len(self.hero_walk_textures) > 0:
+            # Utiliser la première frame comme référence
+            first_texture = self.hero_walk_textures[0]
+            try:
+                width = float(first_texture.width) * self.hero.scale
+                height = float(first_texture.height) * self.hero.scale
+                return width, height
+            except (TypeError, AttributeError):
+                pass
+        
+        # Fallback : utiliser les propriétés du sprite actuel
+        if hasattr(self.hero, 'width') and hasattr(self.hero, 'height'):
+            width = float(self.hero.width)
+            height = float(self.hero.height)
+            return width, height
+        
+        # Dernière option : dimensions par défaut
+        width = 16.0 * self.hero.scale
+        height = 16.0 * self.hero.scale
+        return width, height
+    
+    def _position_hero_on_ground(self, ground_level):
+        """Positionne le héros pour que ses pieds touchent exactement le niveau du sol spécifié"""
+        hero_width, hero_height = self._get_hero_dimensions()
+        # Le bas du sprite (pieds) doit être au niveau ground_level
+        # Donc le centre doit être à ground_level + (hauteur/2)
+        self.hero.center_y = ground_level + hero_height / 2
+    
+    def _is_hero_on_ground(self):
+        """Vérifie si le héros est au sol (pas en saut)"""
+        hero_width, hero_height = self._get_hero_dimensions()
+        hero_bottom = self.hero.center_y - hero_height / 2
+        ground_level = self.platform_levels[0]
+        
+        # Tolérance de 5px comme dans le système de collision
+        return hero_bottom <= ground_level + 5
 
     def start_mission(self):
         self.is_active = True
@@ -69,9 +129,9 @@ class ExploreMission:
         # Réduire la taille du héros pour cette mission seulement
         self.hero.scale = 0.5  # Diviser la taille par 2
 
-        # Positionner le héros au sol côté gauche (niveau 0)
-        self.hero.center_x = SURVEILLANCE_SCREEN_X + 20
-        self.hero.center_y = self.platform_levels[0]  # Exactement au niveau du sol
+        # Positionner le héros au sol côté gauche (niveau 0) - pieds sur le sol
+        self.hero.center_x = self.overlay_x + 20
+        self._position_hero_on_ground(self.platform_levels[0])
         self.hero.change_x = 0
         self.hero.change_y = 0
         self.player_list.append(self.hero)
@@ -103,7 +163,7 @@ class ExploreMission:
             return
 
         # Vérifier si le héros atteint le bord droit de l'écran
-        if self.hero.center_x >= SURVEILLANCE_SCREEN_X + SURVEILLANCE_SCREEN_WIDTH - 20:
+        if self.hero.center_x >= self.overlay_x + self.overlay_w - 20:
             self.teleport_hero_and_regenerate()
 
         # Auto-contrôle du héros: avancer, sauter parfois (uniquement si cette mission est active)
@@ -163,6 +223,16 @@ class ExploreMission:
                         should_jump = True
                         break
             
+            # Bloquer le saut si un artefact est proche (<= 50 px) devant le héros
+            if len(self.artifact_list) > 0:
+                try:
+                    artifact = self.artifact_list[0]
+                    dx_to_artifact = artifact.center_x - self.hero.center_x
+                    if dx_to_artifact > 0 and dx_to_artifact <= 50:
+                        should_jump = False
+                except Exception:
+                    pass
+
             # Saut intelligent seulement (pas de saut aléatoire)
             if (should_jump and current_velocity_y == 0):
                 current_velocity_y = self.jump_strength
@@ -191,7 +261,8 @@ class ExploreMission:
                     platform_bottom = platform.center_y - platform_height / 2
                     
                     # Seulement empêcher si le héros est vraiment bloqué sur le côté (pas en train de tomber)
-                    hero_height = 8  # Héros réduit : 16 * 0.5 = 8 pixels
+                    # Calculer les vraies dimensions du héros
+                    hero_width, hero_height = self._get_hero_dimensions()
                     hero_bottom = self.hero.center_y - hero_height / 2
                     hero_top = self.hero.center_y + hero_height / 2
                     
@@ -201,29 +272,76 @@ class ExploreMission:
                     # 3. Il essaie vraiment de traverser horizontalement
                     if (hero_bottom < platform_top - 5 and hero_top > platform_bottom + 5 and  # Au niveau vertical avec marge
                         abs(current_velocity_y) < 2):  # Pas en train de tomber rapidement
-                        hero_width = 8  # Héros réduit : 16 * 0.5 = 8 pixels
+                        # Utiliser les dimensions déjà calculées
                         # Seulement repousser si vraiment sur le côté gauche de la plateforme
                         if self.hero.center_x > platform_left and self.hero.center_x < platform_right:
                             self.hero.center_x = platform_left - hero_width / 2
             
             # Limites écran horizontales
-            left_bound = SURVEILLANCE_SCREEN_X + 20
-            right_bound = SURVEILLANCE_SCREEN_X + SURVEILLANCE_SCREEN_WIDTH - 20
+            left_bound = self.overlay_x + 20
+            # Keep hero inside 20px margins left/right
+            right_bound = self.overlay_x + self.overlay_w - 20
             if self.hero.center_x > right_bound:
                 self.hero.center_x = right_bound
             if self.hero.center_x < left_bound:
                 self.hero.center_x = left_bound
 
-            # Mouvement vertical avec collisions plateformes
-            self.hero.center_y += current_velocity_y
-            hits = arcade.check_for_collision_with_list(self.hero, self.platform_list)
-            if hits:
-                # Se poser sur la plateforme seulement si on tombe dessus (pas si on la traverse)
-                if current_velocity_y <= 0:  # Seulement quand on tombe
-                    hero_height = 8  # Héros réduit : 16 * 0.5 = 8 pixels
-                    top = max((s.center_y + (s.texture.height if hasattr(s, 'texture') and s.texture else 15) / 2) for s in hits)
-                    self.hero.center_y = top + hero_height / 2
-                    current_velocity_y = 0
+            # Vérifier d'abord si on est déjà sur une plateforme stable
+            if self.hero_on_platform:
+                # Maintenir la position Y stable sur la plateforme (comme l'agent au sol)
+                self._position_hero_on_ground(self.hero_platform_level)
+                
+                # Vérifier si on veut sauter ou si on tombe de la plateforme
+                hero_width, hero_height = self._get_hero_dimensions()
+                hero_left = self.hero.center_x - hero_width / 2
+                hero_right = self.hero.center_x + hero_width / 2
+                
+                # Vérifier si on est encore au-dessus d'une plateforme
+                still_on_platform = False
+                for platform in self.platform_list:
+                    platform_width = platform.texture.width if hasattr(platform, 'texture') and platform.texture else 60
+                    if hasattr(platform, 'scale_x'):
+                        platform_width *= platform.scale_x
+                    platform_left = platform.center_x - platform_width / 2
+                    platform_right = platform.center_x + platform_width / 2
+                    platform_top = platform.center_y + (platform.texture.height if hasattr(platform, 'texture') and platform.texture else 15) / 2
+                    
+                    # Si le héros est encore au-dessus de cette plateforme
+                    if (abs(platform_top - self.hero_platform_level) < 5 and  # Même niveau
+                        hero_right > platform_left + 10 and hero_left < platform_right - 10):  # Encore au-dessus avec marge
+                        still_on_platform = True
+                        break
+                
+                # Si plus au-dessus d'une plateforme, commencer à tomber
+                if not still_on_platform:
+                    self.hero_on_platform = False
+                    current_velocity_y = 0  # Commencer la chute doucement
+            else:
+                # Mouvement vertical normal avec collisions plateformes
+                self.hero.center_y += current_velocity_y
+                hits = arcade.check_for_collision_with_list(self.hero, self.platform_list)
+                if hits:
+                    # Se poser sur la plateforme seulement si on tombe dessus (pas si on la traverse)
+                    if current_velocity_y <= 0:  # Seulement quand on tombe
+                        # Trouver le haut de la plateforme la plus haute touchée
+                        top = max((s.center_y + (s.texture.height if hasattr(s, 'texture') and s.texture else 15) / 2) for s in hits)
+                        # Positionner le héros pour que ses pieds touchent le haut de la plateforme
+                        self._position_hero_on_ground(top)
+                        current_velocity_y = 0
+                        # Marquer qu'on est sur une plateforme (verrouillage stable)
+                        self.hero_on_platform = True
+                        self.hero_platform_level = top
+                else:
+                    # Si pas de collision avec plateforme, vérifier si on est au sol
+                    hero_width, hero_height = self._get_hero_dimensions()
+                    hero_bottom = self.hero.center_y - hero_height / 2
+                    ground_level = self.platform_levels[0]
+                    
+                    if hero_bottom <= ground_level + 5:  # Tolérance de 5px
+                        # Verrouiller au sol comme l'agent
+                        self._position_hero_on_ground(ground_level)
+                        current_velocity_y = 0
+                        self.hero_on_platform = False
             
             # Sauvegarder la vélocité temporaire pour la prochaine frame
             self.hero.temp_velocity_y = current_velocity_y
@@ -254,8 +372,9 @@ class ExploreMission:
         self.bullet_list.update()
         for bullet in list(self.bullet_list):
             # Supprimer les balles qui sortent de l'écran
-            if (bullet.center_x > SURVEILLANCE_SCREEN_X + SURVEILLANCE_SCREEN_WIDTH + 20 or
-                bullet.center_x < SURVEILLANCE_SCREEN_X - 20):
+            # Despawn bullets inside margins: 20px before right, 20px after left
+            if (bullet.center_x > self.overlay_x + self.overlay_w - 20 or
+                bullet.center_x < self.overlay_x + 20):
                 bullet.remove_from_sprite_lists()
             
             # Collision balles d'ennemis avec le héros
@@ -302,13 +421,26 @@ class ExploreMission:
         self.explosion_list.update()
 
         # Vérifier récupération de l'artefact
-        if len(self.artifact_list) > 0 and arcade.check_for_collision(self.hero, self.artifact_list[0]):
-            self.success = True
-            # Effet simple
-            fx = Explosion(self.artifact_list[0].center_x, self.artifact_list[0].center_y)
-            self.explosion_list.append(fx)
-            self.artifact_list[0].remove_from_sprite_lists()
-            self.end_mission()
+        if len(self.artifact_list) > 0:
+            artifact = self.artifact_list[0]
+            picked = False
+            try:
+                if arcade.check_for_collision(self.hero, artifact):
+                    picked = True
+            except Exception:
+                picked = False
+            if not picked and self._hero_overlaps_artifact_lenient(artifact):
+                picked = True
+            if picked:
+                self.success = True
+                # Effet simples
+                fx = Explosion(artifact.center_x, artifact.center_y)
+                self.explosion_list.append(fx)
+                artifact.remove_from_sprite_lists()
+                self.end_mission()
+        
+        # Mettre à jour l'animation du héros
+        self._update_hero_animation(delta_time)
 
     def is_mission_finished(self):
         return self.mission_completed and not self.is_active
@@ -327,9 +459,9 @@ class ExploreMission:
 
     def teleport_hero_and_regenerate(self):
         """Téléporte le héros à gauche et génère un nouveau pattern"""
-        # Téléporter le héros au début de l'écran (niveau sol)
-        self.hero.center_x = SURVEILLANCE_SCREEN_X + 20
-        self.hero.center_y = self.platform_levels[0]  # Exactement au niveau du sol
+        # Téléporter le héros au début de l'écran (niveau sol) - pieds sur le sol
+        self.hero.center_x = self.overlay_x + 20
+        self._position_hero_on_ground(self.platform_levels[0])
         self.hero.change_y = 0  # Réinitialiser la vélocité verticale
         
         # Nettoyer les anciens sprites (sauf le héros)
@@ -351,10 +483,11 @@ class ExploreMission:
         # Sol de base (divisé par 2)
         ground = arcade.Sprite()
         ground.texture = arcade.make_soft_square_texture(10, (0, 100, 0), outer_alpha=255)  # Vert foncé explicite
-        ground.scale_x = SURVEILLANCE_SCREEN_WIDTH / 10
+        # Rétrécir légèrement le sol pour éviter qu'il ne touche les bords (8 px de chaque côté)
+        ground.scale_x = max(0, (self.overlay_w - 10) / 10)
         ground.scale_y = 1
-        ground.center_x = SURVEILLANCE_SCREEN_X + SURVEILLANCE_SCREEN_WIDTH // 2
-        ground.center_y = SURVEILLANCE_SCREEN_Y + 10
+        ground.center_x = self.overlay_x + self.overlay_w // 2
+        ground.center_y = self.overlay_y + 10
         self.platform_list.append(ground)
         
         # Plateformes à hauteurs standardisées avec génération intelligente
@@ -383,7 +516,7 @@ class ExploreMission:
             while attempts < 10:  # Limite les tentatives pour éviter boucle infinie
                 width = random.randint(30, 60)  # Largeur divisée par 2
                 height = 8  # Hauteur divisée par 2
-                x = SURVEILLANCE_SCREEN_X + random.randint(40, SURVEILLANCE_SCREEN_WIDTH - 40)  # Marges divisées par 2
+                x = self.overlay_x + random.randint(40, self.overlay_w - 40)  # Marges divisées par 2
                 
                 y = self.platform_levels[level]
                 
@@ -408,48 +541,235 @@ class ExploreMission:
                 
                 attempts += 1
         
-        # Ennemis statiques (tous en rouge) placés sur des surfaces (2x plus nombreux)
+        # Ennemis statiques (tous en rouge) placés sur des surfaces, avec espacement minimal
         num_enemies = random.randint(4, 8)
+        min_enemy_spacing = 30  # rayon minimal (px) entre ennemis
         
         # Créer une liste des surfaces disponibles (niveaux standardisés + plateformes)
         available_surfaces = []
         
         # Sol principal (niveau 0) - marges divisées par 2
-        available_surfaces.append({
-            'x_min': SURVEILLANCE_SCREEN_X + 20,
-            'x_max': SURVEILLANCE_SCREEN_X + SURVEILLANCE_SCREEN_WIDTH - 20,
+        ground_surface = {
+            'x_min': self.overlay_x + 20,
+            'x_max': self.overlay_x + self.overlay_w - 20,
             'y': self.platform_levels[0] + 4,  # Niveau sol + demi-hauteur ennemi (divisé par 2)
             'level': 0
-        })
+        }
+        available_surfaces.append(ground_surface)
         
         # Ajouter les plateformes comme surfaces
+        platform_surfaces = []
         for platform_info in platforms_info:
             platform_left = platform_info['x'] - platform_info['width'] / 2
             platform_right = platform_info['x'] + platform_info['width'] / 2
-            available_surfaces.append({
+            surf = {
                 'x_min': platform_left + 5,  # Marge divisée par 2
                 'x_max': platform_right - 5,
                 'y': platform_info['y'] + 8,  # Surface + demi-hauteur ennemi (divisé par 2)
                 'level': platform_info['level']
-            })
+            }
+            platform_surfaces.append(surf)
+            available_surfaces.append(surf)
         
-        # Placer les ennemis sur les surfaces disponibles
-        for _ in range(num_enemies):
-            if available_surfaces:
-                surface = random.choice(available_surfaces)
-                if surface['x_max'] > surface['x_min']:  # Vérifier qu'il y a de la place
+        # Placer les ennemis sur les surfaces disponibles en respectant l'espacement
+        placed_positions = []  # [(x,y)]
+
+        # 1) Placer au moins la moitié des ennemis au sol
+        min_on_ground = (num_enemies + 1) // 2
+        ground_placed = 0
+        for _ in range(min_on_ground):
+            attempts = 0
+            placed = False
+            while attempts < 100 and not placed:
+                if ground_surface['x_max'] <= ground_surface['x_min']:
+                    break
+                x = random.randint(int(ground_surface['x_min']), int(ground_surface['x_max']))
+                y = ground_surface['y']
+                ok = True
+                for (px, py) in placed_positions:
+                    dx = x - px
+                    dy = y - py
+                    if (dx*dx + dy*dy) < (min_enemy_spacing * min_enemy_spacing):
+                        ok = False
+                        break
+                if ok:
                     enemy = arcade.Sprite()
-                    enemy.texture = arcade.make_soft_square_texture(8, (255, 0, 0), outer_alpha=255)  # Rouge explicite, taille divisée par 2
-                    enemy.center_x = random.randint(int(surface['x_min']), int(surface['x_max']))
-                    enemy.center_y = surface['y']
+                    enemy.texture = arcade.make_soft_square_texture(8, (255, 0, 0), outer_alpha=255)
+                    enemy.center_x = x
+                    enemy.center_y = y
                     self.enemy_list.append(enemy)
+                    placed_positions.append((x, y))
+                    ground_placed += 1
+                    placed = True
+                attempts += 1
+
+        # 2) Placer le reste sur n'importe quelle surface (plateformes + sol), avec espacement
+        remaining = num_enemies - ground_placed
+        for _ in range(remaining):
+            attempts = 0
+            placed = False
+            while attempts < 50 and not placed:
+                surface_pool = platform_surfaces if platform_surfaces else [ground_surface]
+                surface = random.choice(surface_pool)
+                if surface['x_max'] > surface['x_min']:
+                    x = random.randint(int(surface['x_min']), int(surface['x_max']))
+                    y = surface['y']
+                    ok = True
+                    for (px, py) in placed_positions:
+                        dx = x - px
+                        dy = y - py
+                        if (dx*dx + dy*dy) < (min_enemy_spacing * min_enemy_spacing):
+                            ok = False
+                            break
+                    if ok:
+                        enemy = arcade.Sprite()
+                        enemy.texture = arcade.make_soft_square_texture(8, (255, 0, 0), outer_alpha=255)
+                        enemy.center_x = x
+                        enemy.center_y = y
+                        self.enemy_list.append(enemy)
+                        placed_positions.append((x, y))
+                        placed = True
+                attempts += 1
         
         # Artefact (cube jaune, 5% de chance) - TOUJOURS au niveau du sol
         if random.random() < self.artifact_chance:
             artifact = arcade.Sprite()
             artifact.texture = arcade.make_soft_square_texture(8, (255, 215, 0), outer_alpha=255)  # Or explicite, taille divisée par 2
-            artifact.center_x = SURVEILLANCE_SCREEN_X + random.randint(SURVEILLANCE_SCREEN_WIDTH//2, SURVEILLANCE_SCREEN_WIDTH - 20)  # Marge divisée par 2
+            artifact.center_x = self.overlay_x + random.randint(self.overlay_w//2, self.overlay_w - 20)  # Marge divisée par 2
             artifact.center_y = self.platform_levels[0]
             self.artifact_list.append(artifact)
+    
+    def _load_hero_textures(self):
+        """Charge les textures d'animation de marche du héros"""
+        # Cherche les assets dans différents emplacements possibles
+        base_candidates = [
+            'assets',
+            os.path.join(os.path.dirname(__file__), '..', 'assets'),
+        ]
+        base_candidates = [os.path.normpath(p) for p in base_candidates]
+        
+        walk_dir = None
+        for base in base_candidates:
+            walk_path = os.path.join(base, 'walk')
+            if os.path.exists(walk_path):
+                walk_dir = walk_path
+                break
+        
+        if walk_dir:
+            # Charger les frames hero-walk-frame-x.png
+            for i in range(4):  # 0, 1, 2, 3
+                frame_path = os.path.join(walk_dir, f'hero-walk-frame-{i}.png')
+                if os.path.exists(frame_path):
+                    try:
+                        texture = arcade.load_texture(frame_path)
+                        self.hero_walk_textures.append(texture)
+                        print(f"Texture héros chargée: {frame_path}")
+                    except Exception as e:
+                        print(f"Erreur chargement {frame_path}: {e}")
+        
+        print(f"Textures de marche héros chargées: {len(self.hero_walk_textures)}")
+        
+        # Si on a des textures, utiliser la première comme texture par défaut
+        if self.hero_walk_textures and hasattr(self.hero, 'texture'):
+            self.hero.texture = self.hero_walk_textures[0]
+    
+    def _update_hero_animation(self, delta_time):
+        """Met à jour l'animation de marche du héros - inspiré de l'agent"""
+        if not self.hero_walk_textures:
+            return  # Pas d'animation si pas de textures
+        
+        # Déterminer si le héros se déplace ET qu'il est au sol/sur plateforme
+        # Animation seulement si le héros marche (pas en saut)
+        is_on_ground = self.hero_on_platform or self._is_hero_on_ground()
+        self.hero_is_moving = is_on_ground  # Animation seulement au sol/plateforme
+        
+        # Animation simple comme l'agent : juste changer la texture, pas toucher à la position
+        if self.hero_is_moving:
+            self.hero_animation_timer += delta_time
+            
+            # Changer de frame selon la vitesse d'animation
+            if self.hero_animation_timer >= self.hero_animation_speed:
+                self.hero_animation_timer = 0.0
+                self.hero_animation_index = (self.hero_animation_index + 1) % len(self.hero_walk_textures)
+                
+                # Appliquer la nouvelle texture (comme l'agent, sans toucher à la position)
+                if hasattr(self.hero, 'texture'):
+                    self.hero.texture = self.hero_walk_textures[self.hero_animation_index]
+        
+        # Si on a arrêté de bouger (en saut), rester sur la première frame
+        elif self.hero_was_moving and not self.hero_is_moving:
+            self.hero_animation_index = 0
+            self.hero_animation_timer = 0.0
+            if hasattr(self.hero, 'texture'):
+                self.hero.texture = self.hero_walk_textures[0]
+        
+        # Mémoriser l'état pour la prochaine frame
+        self.hero_was_moving = self.hero_is_moving
+
+    def set_screen_bounds(self, x, y, w, h):
+        # Update overlay bounds and recompute level baselines
+        dx = x - getattr(self, 'overlay_x', x)
+        dy = y - getattr(self, 'overlay_y', y)
+        self.overlay_x = x
+        self.overlay_y = y
+        self.overlay_w = w
+        self.overlay_h = h
+        self.platform_levels = [
+            self.overlay_y + 15,
+            self.overlay_y + 15 + self.jump_height,
+            self.overlay_y + 15 + self.jump_height * 2,
+            self.overlay_y + 15 + self.jump_height * 3,
+            self.overlay_y + 15 + self.jump_height * 4,
+            self.overlay_y + 15 + self.jump_height * 5,
+        ]
+        # Translate existing sprites to match overlay move
+        def shift_list(sprite_list, dx, dy):
+            if sprite_list:
+                for s in list(sprite_list):
+                    try:
+                        s.center_x += dx
+                        s.center_y += dy
+                    except Exception:
+                        pass
+        shift_list(self.platform_list, dx, dy)
+        shift_list(self.enemy_list, dx, dy)
+        shift_list(self.artifact_list, dx, dy)
+        shift_list(self.bullet_list, dx, dy)
+        shift_list(self.explosion_list, dx, dy)
+        if self.hero is not None:
+            try:
+                self.hero.center_x += dx
+                self.hero.center_y += dy
+            except Exception:
+                pass
+
+    def _hero_overlaps_artifact_lenient(self, artifact):
+        """Retourne True si le héros doit ramasser l'artefact avec une tolérance verticale au sol.
+        - Chec horizontal: chevauchement en X avec petite marge
+        - Chec vertical: les pieds du héros (bas du sprite) ne sont pas trop haut au-dessus de l'artefact
+        """
+        try:
+            hero_w, hero_h = self._get_hero_dimensions()
+            hero_left = self.hero.center_x - hero_w / 2.0
+            hero_right = self.hero.center_x + hero_w / 2.0
+            hero_bottom = self.hero.center_y - hero_h / 2.0
+        except Exception:
+            hero_left = self.hero.center_x - 10.0
+            hero_right = self.hero.center_x + 10.0
+            hero_bottom = self.hero.center_y - 10.0
+        try:
+            aw = float(getattr(artifact, 'width', 8.0))
+            ah = float(getattr(artifact, 'height', 8.0))
+        except Exception:
+            aw, ah = 8.0, 8.0
+        art_left = artifact.center_x - aw / 2.0
+        art_right = artifact.center_x + aw / 2.0
+        art_top = artifact.center_y + ah / 2.0
+        # Marges
+        margin_x = 6.0
+        margin_y = 12.0
+        horizontal_ok = (hero_right >= art_left - margin_x) and (hero_left <= art_right + margin_x)
+        vertical_ok = (hero_bottom <= art_top + margin_y)
+        return horizontal_ok and vertical_ok
 
 

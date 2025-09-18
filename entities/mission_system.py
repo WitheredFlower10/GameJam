@@ -1,4 +1,5 @@
 import random
+import math
 from utils.constants import MISSION_DURATION, CREDIT_INITIAL
 from mini_games.terminal import MainTerminal
 
@@ -29,7 +30,14 @@ class MissionSystem:
         self.missions_assigned_count = 0
 
         self.terminal_on = False
-
+        # Demande d'ouverture du mini-jeu Wire Puzzle
+        self.wire_puzzle_requested = False
+        # Flag pour marquer si le puzzle wire a été complété
+        self.wire_puzzle_completed = False
+        
+        # Référence au ship pour gérer le HeroNPC
+        self.ship = None
+        
         
         self.create_mission_templates()
     
@@ -107,7 +115,7 @@ class MissionSystem:
             
             print(f"Mission '{self.current_mission['name']}' assignée au héros!")
     
-    def update(self, delta_time):
+    def update(self, delta_time, ship=None):
         self.mission_timer += delta_time
         
         if self.current_mission:
@@ -118,48 +126,82 @@ class MissionSystem:
                 # Vérifier si la mission de bataille est terminée
                 if (self.hero.battle_mission and 
                     self.hero.battle_mission.mission_completed):
-                    self.complete_mission()
+                    self.complete_mission(ship)
                 # Vérifier si la mission est terminée normalement
                 elif self.hero.is_mission_complete():
-                    self.complete_mission()
+                    self.complete_mission(ship)
                 elif self.hero.is_mission_failed():
-                    self.fail_mission()
+                    self.fail_mission(ship)
                 elif self.mission_timer - self.current_mission['start_time'] > self.current_mission['duration']:
-                    self.timeout_mission()
+                    self.timeout_mission(ship)
     
-    def complete_mission(self):
+    def complete_mission(self, ship=None):
         if self.current_mission:
             print(f"Mission '{self.current_mission['name']}' réussie!")
             self.current_mission = None
+            # Faire réapparaître le héros
+            if ship:
+                ship.set_hero_on_mission(False)
     
-    def fail_mission(self):
+    def fail_mission(self, ship=None):
         if self.current_mission:
             print(f"Mission '{self.current_mission['name']}' échouée!")
             self.current_mission = None
+            # Faire réapparaître le héros
+            if ship:
+                ship.set_hero_on_mission(False)
     
-    def timeout_mission(self):
+    def timeout_mission(self, ship=None):
         if self.current_mission:
             print(f"Mission '{self.current_mission['name']}' expirée!")
             self.current_mission = None
+            # Faire réapparaître le héros
+            if ship:
+                ship.set_hero_on_mission(False)
     
     def get_nearby_interactions(self, agent_x):
-        # Retourner les points d'interaction à proximité de l'agent
+        # Retourner les points d'interaction à proximité de l'agent (X-only) en utilisant range_x par point
         nearby = []
         for point in self.ship_interaction_points:
-            if abs(point['x'] - agent_x) < 50:
-                nearby.append(point)
+            try:
+                # Filtrer "Amélioration Surveillance" si déjà complété
+                if point.get('name') == "Amélioration Surveillance" and self.wire_puzzle_completed:
+                    continue
+                px = float(point.get('x', 0.0))
+                threshold = float(point.get('range_x', 50.0))
+                if abs(px - float(agent_x)) < threshold:
+                    nearby.append(point)
+            except Exception:
+                continue
         return nearby
     
-    def interact_with_point(self, point_name):
+    def interact_with_point(self, point_name, ship=None):
         # Gérer les interactions avec les points d'intérêt
         if point_name == "Bureau des Missions":
+            # Ancienne interaction - garde pour compatibilité
             if not self.current_mission:
                 self.start_random_mission()
+                if ship:
+                    ship.set_hero_on_mission(True)  # Faire disparaître le héros
                 return "Mission assignée au héros !"
             else:
                 return "Une mission est déjà en cours."
+        elif point_name == "Parler au Héros":
+            # Nouvelle interaction avec le HeroNPC
+            if not self.current_mission:
+                self.start_random_mission()
+                if ship:
+                    ship.set_hero_on_mission(True)  # Faire disparaître le héros
+                return "Mission assignée au héros ! Il part en mission."
+            else:
+                return "Le héros est déjà en mission."
         elif point_name == "Amélioration Surveillance":
-            return "Surveillance améliorée !"
+            # Vérifier si le puzzle n'a pas déjà été complété
+            if self.wire_puzzle_completed:
+                return "Amélioration déjà effectuée."
+            # Remplacer par le lancement du mini-jeu Wire Puzzle
+            self.wire_puzzle_requested = True
+            return "Wire Puzzle lancé !"
         elif point_name == "Station de Paris":
             if not self.current_mission:
                 return "Aucune mission active pour parier."
@@ -179,6 +221,10 @@ class MissionSystem:
     
     def set_ship_interaction_points(self, points):
         self.ship_interaction_points = points
+    
+    def set_ship(self, ship):
+        """Définir la référence au ship pour gérer le HeroNPC"""
+        self.ship = ship
     
     def place_bet(self, bet_type, amount):
         # Placer un pari sur la mission
