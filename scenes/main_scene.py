@@ -159,6 +159,7 @@ class MainScene(arcade.View):
 
         # Lier les systèmes
         self.mission_system.set_hero(self.hero)
+        self.hero.set_mission_system(self.mission_system)
         self.surveillance_screen.set_hero(self.hero)
         # Connecter le MissionSystem à l'écran de surveillance pour révéler la vie après le mini-jeu
         if hasattr(self.surveillance_screen, 'set_mission_system'):

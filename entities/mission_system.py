@@ -209,6 +209,7 @@ class MissionSystem:
                     self.complete_mission(ship)
                 elif self.hero.is_mission_failed():
                     self.fail_mission(ship)
+                # Vérifier si la mission est terminée par timeout
                 elif self.mission_timer - self.current_mission['start_time'] > self.current_mission['duration']:
                     self.timeout_mission(ship)
     

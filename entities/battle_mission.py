@@ -172,7 +172,7 @@ class ShipExplosion(arcade.Sprite):
 
 
 class BattleMission:
-    def __init__(self, hero, enemies_to_kill=None, on_game_over_callback=None, on_game_end_callback=None):
+    def __init__(self, hero, enemies_to_kill=None, on_game_over_callback=None, on_game_end_callback=None, mission_system=None):
         # Listes de sprites
         self.player_list = None
         self.enemy_list = None
@@ -182,6 +182,9 @@ class BattleMission:
 
         self.hero = hero
         self.player_sprite = None
+        
+        # Référence au système de mission pour vérifier les paris
+        self.mission_system = mission_system
         
         # Charger les textures pour les ennemis et le héros
         self.enemy_texture = self._load_enemy_texture()
@@ -268,7 +271,7 @@ class BattleMission:
         self.boss_max_health = 150
         self.last_boss_shot = 0
         self.success = False
-        # Le nombre d'ennemis est déjà défini dans __init__
+        # Le nombre d'ennemis est déjà défini dans __init__()
     
     def start_mission(self):
         self.is_active = True
@@ -365,33 +368,35 @@ class BattleMission:
             return  # Ne pas continuer l'update pendant le délai
         
         # Déclencher le boss quand le quota d'ennemis normaux est atteint
-        if (not self.boss_active) and (self.enemies_destroyed >= self.enemies_to_kill - 1):
+        if (not self.boss_active) and (self.enemies_destroyed >= self.enemies_to_kill - 1) and (self.mission_system is not None and self.mission_system.bet_placed):
             self.spawn_boss()
             # Compter le boss comme un ennemi à tuer
             if not self.boss_counted:
                 self.boss_counted = True
 
-        # Spawn d'ennemis (désactivé quand le boss est présent)
+        # Spawn d'ennemis (désactivé quand le boss est présent OU quand le quota est atteint mais aucun pari placé)
         if (not self.boss_active) and (time.time() - self.last_enemy_spawn > SPAWN_INTERVAL):
-            enemy = arcade.Sprite()
-            if self.enemy_texture:
-                enemy.texture = self.enemy_texture
-                enemy.scale = 0.3  # Ajuster la taille selon l'image
-                print("Ennemi volant créé avec texture PNG")
-            else:
-                # Fallback si la texture n'est pas chargée
-                enemy.texture = arcade.make_soft_square_texture(30, arcade.color.RED, outer_alpha=255)
-                print("Ennemi volant créé avec fallback rouge")
-            
-            # Spawn encore 20px plus à gauche (désormais à l'intérieur de l'overlay)
-            enemy.center_x = self.overlay_x + self.overlay_w - 20
-            enemy.center_y = random.randint(
-                int(self.overlay_y + 20), 
-                int(self.overlay_y + self.overlay_h - 20)
-            )
-            enemy.change_x = -ENEMY_SPEED
-            self.enemy_list.append(enemy)
-            self.last_enemy_spawn = time.time()
+            # Continuer le spawn si le quota est atteint mais aucun pari n'est placé
+            if self.enemies_destroyed < self.enemies_to_kill - 1 or (self.mission_system is not None and not self.mission_system.bet_placed):
+                enemy = arcade.Sprite()
+                if self.enemy_texture:
+                    enemy.texture = self.enemy_texture
+                    enemy.scale = 0.3  # Ajuster la taille selon l'image
+                    print("Ennemi volant créé avec texture PNG")
+                else:
+                    # Fallback si la texture n'est pas chargée
+                    enemy.texture = arcade.make_soft_square_texture(30, arcade.color.RED, outer_alpha=255)
+                    print("Ennemi volant créé avec fallback rouge")
+                
+                # Spawn encore 20px plus à gauche (désormais à l'intérieur de l'overlay)
+                enemy.center_x = self.overlay_x + self.overlay_w - 20
+                enemy.center_y = random.randint(
+                    int(self.overlay_y + 20), 
+                    int(self.overlay_y + self.overlay_h - 20)
+                )
+                enemy.change_x = -ENEMY_SPEED
+                self.enemy_list.append(enemy)
+                self.last_enemy_spawn = time.time()
 
         # Mouvement automatique du héros
         self.update_hero_movement()

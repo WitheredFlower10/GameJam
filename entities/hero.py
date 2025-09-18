@@ -36,6 +36,9 @@ class Hero(arcade.Sprite):
         # Mission d'exploration
         self.explore_mission = None
         
+        # Référence au système de mission
+        self.mission_system = None
+        
         # Callbacks pour les scènes de fin de jeu
         self.on_game_over_callback = None
         self.on_game_end_callback = None
@@ -135,7 +138,8 @@ class Hero(arcade.Sprite):
             # Passer l'instance du héros, le nombre d'ennemis et les callbacks à la mission
             self.battle_mission = BattleMission(self, enemies_to_kill, 
                                               on_game_over_callback=getattr(self, 'on_game_over_callback', None),
-                                              on_game_end_callback=getattr(self, 'on_game_end_callback', None))
+                                              on_game_end_callback=getattr(self, 'on_game_end_callback', None),
+                                              mission_system=self.mission_system)
             self.battle_mission.start_mission()
         elif mission_data.get('type') == 'Exploration':
             from entities.explore_mission import ExploreMission
@@ -176,3 +180,7 @@ class Hero(arcade.Sprite):
         """Définit les callbacks pour les scènes de fin de jeu"""
         self.on_game_over_callback = on_game_over_callback
         self.on_game_end_callback = on_game_end_callback
+
+    def set_mission_system(self, mission_system):
+        """Définit la référence au système de mission"""
+        self.mission_system = mission_system
